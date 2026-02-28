@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-REPO="https://github.com/sakaax/memory"
+REPO="https://github.com/Sakaax/memory"
 INSTALL_DIR="${MEMORY_DIR:-$HOME/.memory}"
 
 echo "memory — installing..."

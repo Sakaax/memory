@@ -36,13 +36,13 @@ Your context persists across tools, sessions, and reboots.
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sakaax/memory/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Sakaax/memory/main/install.sh | bash
 ```
 
 Or manually:
 
 ```bash
-git clone https://github.com/sakaax/memory ~/.memory
+git clone https://github.com/Sakaax/memory ~/.memory
 cd ~/.memory && bun install
 ./memory setup
 source ~/.zshrc
@@ -179,7 +179,7 @@ Connectors follow the same pattern — see `gemini-memory` in `~/.local/bin/`.
 ## Contributing
 
 ```bash
-git clone https://github.com/sakaax/memory
+git clone https://github.com/Sakaax/memory
 cd memory && bun install
 bun run src/cli.ts help
 ```
