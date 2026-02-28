@@ -88,6 +88,34 @@
     }
     .icon-btn:hover { color: var(--text); border-color: var(--border2); }
 
+    /* ── Scope tabs ─────────────────────────────────── */
+    .scope-tabs {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .scope-tab {
+      padding: 4px 11px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-family: monospace;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: none;
+      color: var(--dim2);
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .scope-tab:hover { color: var(--text); border-color: var(--border2); }
+    .scope-tab.active {
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+      color: var(--accent);
+    }
+
     /* ── Grid ──────────────────────────────────────── */
     main {
       display: grid;
@@ -349,6 +377,7 @@
 
   <header>
     <div class="logo">memory</div>
+    <div class="scope-tabs" id="scope-tabs"></div>
     <div class="search-wrap">
       <input type="search" id="search" placeholder="Search memories…" autocomplete="off" />
     </div>
@@ -424,6 +453,28 @@
 
     // ── State ───────────────────────────────────────
     let editingId = null
+
+    // ── Scopes ──────────────────────────────────────
+    async function loadScopes() {
+      const { scopes, active } = await fetch('/api/scopes').then(r => r.json())
+      const tabs = document.getElementById('scope-tabs')
+      tabs.innerHTML = scopes.map(s =>
+        `<button class="scope-tab ${s === active ? 'active' : ''}" data-scope="${esc(s)}">${esc(s)}</button>`
+      ).join('')
+      tabs.querySelectorAll('.scope-tab').forEach(tab => {
+        tab.addEventListener('click', () => switchScope(tab.dataset.scope))
+      })
+    }
+
+    async function switchScope(scope) {
+      await fetch('/api/scope', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope }),
+      })
+      await loadScopes()
+      await load(document.getElementById('search').value)
+    }
 
     // ── Load & render ───────────────────────────────
     async function load(q = '') {
@@ -561,6 +612,7 @@
     })
 
     // ── Init ────────────────────────────────────────
+    loadScopes()
     load()
   </script>
 </body>

@@ -1,6 +1,10 @@
 import { join } from "path"
 import { existsSync } from "fs"
-import { loadStore, saveStore, VALID_TYPES, type MemoryType } from "../store"
+import {
+  loadStore, saveStore, VALID_TYPES,
+  listScopes, readCurrentScope, writeCurrentScope, scopeDir,
+  type MemoryType,
+} from "../store"
 import { runHook } from "../hooks"
 
 const STATIC_DIR = join(import.meta.dir, "static")
@@ -10,6 +14,23 @@ export async function handleRequest(req: Request): Promise<Response> {
   const { pathname } = url
 
   // ── API ──────────────────────────────────────────────────────────────────
+
+  // GET /api/scopes
+  if (pathname === "/api/scopes" && req.method === "GET") {
+    return Response.json({ scopes: listScopes(), active: readCurrentScope() })
+  }
+
+  // POST /api/scope  { scope: string }
+  if (pathname === "/api/scope" && req.method === "POST") {
+    const body = (await req.json()) as { scope?: string }
+    if (!body.scope?.trim()) return Response.json({ error: "scope required" }, { status: 400 })
+    if (!existsSync(scopeDir(body.scope))) {
+      return Response.json({ error: `scope "${body.scope}" not found` }, { status: 404 })
+    }
+    writeCurrentScope(body.scope)
+    const store = loadStore()
+    return Response.json({ scope: body.scope, count: store.memories.length })
+  }
 
   // GET /api/memories[?q=query]
   if (pathname === "/api/memories" && req.method === "GET") {
