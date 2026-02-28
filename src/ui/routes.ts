@@ -54,6 +54,36 @@ export async function handleRequest(req: Request): Promise<Response> {
     return Response.json(memories)
   }
 
+  // POST /api/memories/:id/move  { targetScope: string }
+  if (pathname.match(/^\/api\/memories\/[^/]+\/move$/) && req.method === "POST") {
+    const id = pathname.split("/")[3]
+    const body = (await req.json()) as { targetScope?: string }
+
+    if (!body.targetScope?.trim()) {
+      return Response.json({ error: "targetScope required" }, { status: 400 })
+    }
+    if (!existsSync(scopeDir(body.targetScope))) {
+      return Response.json({ error: `scope "${body.targetScope}" not found` }, { status: 404 })
+    }
+
+    const srcStore = loadStore()
+    const memory   = srcStore.memories.find((m) => m.id === id)
+    if (!memory) return Response.json({ error: "not found" }, { status: 404 })
+
+    // Remove from source scope
+    srcStore.memories = srcStore.memories.filter((m) => m.id !== id)
+    saveStore(srcStore)
+    runHook("on-memory-deleted", memory)
+
+    // Add to target scope
+    const dstStore = loadStore(body.targetScope)
+    dstStore.memories.push(memory)
+    saveStore(dstStore, body.targetScope)
+    runHook("on-memory-added", memory)
+
+    return Response.json({ ok: true, scope: body.targetScope })
+  }
+
   // DELETE /api/memories/:id
   if (pathname.startsWith("/api/memories/") && req.method === "DELETE") {
     const id = pathname.split("/").pop()!

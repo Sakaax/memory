@@ -421,6 +421,13 @@
         </div>
       </div>
 
+      <div class="field" id="move-field" style="display:none">
+        <span class="field-label">Move to scope</span>
+        <select id="edit-move-scope">
+          <option value="">— keep in current scope —</option>
+        </select>
+      </div>
+
       <div class="modal-actions">
         <button class="btn btn-ghost" id="btn-cancel">Cancel</button>
         <button class="btn btn-primary" id="btn-save">Save</button>
@@ -533,7 +540,10 @@
     let cachedMemories = []
 
     async function openEdit(id) {
-      const memories = await fetch('/api/memories').then(r => r.json())
+      const [memories, { scopes, active }] = await Promise.all([
+        fetch('/api/memories').then(r => r.json()),
+        fetch('/api/scopes').then(r => r.json()),
+      ])
       cachedMemories = memories
       const m = memories.find(x => x.id === id)
       if (!m) return
@@ -544,6 +554,19 @@
       document.getElementById('edit-type').value = m.type
       document.getElementById('edit-importance').value = m.importance
       document.getElementById('importance-val').textContent = m.importance.toFixed(1)
+
+      // Populate "move to scope" dropdown
+      const moveSelect = document.getElementById('edit-move-scope')
+      const otherScopes = scopes.filter(s => s !== active)
+      moveSelect.innerHTML = '<option value="">— keep in current scope —</option>'
+      otherScopes.forEach(s => {
+        const opt = document.createElement('option')
+        opt.value = s
+        opt.textContent = s
+        moveSelect.appendChild(opt)
+      })
+      document.getElementById('move-field').style.display = otherScopes.length > 0 ? '' : 'none'
+
       document.getElementById('overlay').classList.remove('hidden')
       document.getElementById('edit-content').focus()
     }
@@ -555,18 +578,30 @@
 
     async function saveEdit() {
       if (!editingId) return
-      const body = {
-        content:    document.getElementById('edit-content').value.trim(),
-        type:       document.getElementById('edit-type').value,
-        domain:     document.getElementById('edit-domain').value.trim(),
-        importance: parseFloat(document.getElementById('edit-importance').value),
+      const targetScope = document.getElementById('edit-move-scope').value
+
+      if (targetScope) {
+        // Move to another scope first, then update fields in target
+        await fetch(`/api/memories/${editingId}/move`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetScope }),
+        })
+      } else {
+        const body = {
+          content:    document.getElementById('edit-content').value.trim(),
+          type:       document.getElementById('edit-type').value,
+          domain:     document.getElementById('edit-domain').value.trim(),
+          importance: parseFloat(document.getElementById('edit-importance').value),
+        }
+        await fetch(`/api/memories/${editingId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
       }
-      await fetch(`/api/memories/${editingId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
       closeModal()
+      await loadScopes()
       load(document.getElementById('search').value)
     }
 

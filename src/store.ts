@@ -124,14 +124,14 @@ export interface MemoryStore {
 
 // ── Store I/O ─────────────────────────────────────────────────────────────────
 
-export function loadStore(): MemoryStore {
-  const file = scopeFile(readCurrentScope())
+export function loadStore(scopeOverride?: string): MemoryStore {
+  const file = scopeFile(scopeOverride ?? readCurrentScope())
   if (!existsSync(file)) return { memories: [] }
   return JSON.parse(readFileSync(file, "utf-8")) as MemoryStore
 }
 
-export function saveStore(store: MemoryStore): void {
-  const scope = readCurrentScope()
+export function saveStore(store: MemoryStore, scopeOverride?: string): void {
+  const scope = scopeOverride ?? readCurrentScope()
   const dir   = scopeDir(scope)
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
   writeFileSync(scopeFile(scope), JSON.stringify(store, null, 2) + "\n")
