@@ -24,8 +24,8 @@ You
 memory remember "I use Bun for everything"
  ↓
 memory.json  ←  single source of truth
- ↓         ↓
-Claude    Gemini    (any CLI)
+ ↓         ↓         ↓
+Claude    Gemini    Codex    (any CLI)
 ```
 
 Each AI connector reads `memory.json` before responding.
@@ -58,24 +58,37 @@ source ~/.zshrc
 memory setup
 ```
 
-Detects installed AI CLIs and auto-configures connectors. No manual config.
+Detects installed AI CLIs and shows an interactive list — select the connectors you want with `Space`, confirm with `Enter`. No manual config.
 
 ```
-memory setup
-
-✓ memory → ~/.local/bin/memory
-✓ PATH updated in ~/.zshrc
-✓ gemini-memory wrapper installed
-
-── Claude Code ──────────────────────────────
-  Add this to ~/.claude/CLAUDE.md:
-  ## Memory Context
-  Before every response, read `~/.memory/memory.json`
-  and use stored memories as context.
-─────────────────────────────────────────────
-Connectors ready: gemini-memory
-Reload shell: source ~/.zshrc
+◆  Select connectors to install:
+│  ◼ gemini   Google Gemini CLI
+│  ◼ claude   Claude Code CLI
+│  ◼ codex    OpenAI Codex CLI
+└
 ```
+
+When done, memory shows which commands to run:
+
+```
+┌─ Ready to use ──────────────────────────┐
+│                                         │
+│  gemini-memory  →  launch gemini with your memory context
+│  claude-memory  →  launch claude with your memory context
+│  codex-memory   →  launch codex  with your memory context
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+---
+
+## Uninstall connectors
+
+```bash
+memory uninstall
+```
+
+Same interactive flow — select connectors to remove. Run `memory setup` to reinstall anytime.
 
 ---
 
@@ -95,7 +108,7 @@ memory remember "Baby due soon — keep it short and ship" --type constraint --d
 
 ```bash
 memory recall                  # all memories
-memory recall development      # filter by domain/type/content
+memory recall development      # filter by domain, type or content keyword
 ```
 
 ### Manage
@@ -103,8 +116,16 @@ memory recall development      # filter by domain/type/content
 ```bash
 memory status                  # stats
 memory forget <id>             # delete by id
-memory dump                    # raw JSON
+memory dump                    # raw JSON export
 ```
+
+### Help
+
+```bash
+memory help
+```
+
+Displays all commands with the MEMORY banner.
 
 ---
 
@@ -112,28 +133,24 @@ memory dump                    # raw JSON
 
 ### Claude Code
 
-Add to `~/.claude/CLAUDE.md`:
-
-```markdown
-## Memory Context
-Before every response, read `~/.memory/memory.json` and use stored memories as context.
+```bash
+claude-memory                          # interactive with memory context
 ```
 
-Claude will silently use your memories in every project.
+Context is injected via `--append-system-prompt`. No config file needed.
 
 ### Gemini CLI
 
-After `memory setup`, use the generated wrapper:
-
 ```bash
-gemini-memory                        # interactive REPL with memory context
-gemini-memory "what runtime do I use?"   # one-shot with memory
+gemini-memory                          # interactive REPL with memory context
+gemini-memory "what runtime do I use?" # one-shot
 ```
 
-### Adding more connectors
+### Codex CLI
 
-Any CLI that supports stdin injection or an initial prompt flag can be connected.
-Connectors follow the same pattern — see `gemini-memory` in `~/.local/bin/`.
+```bash
+codex-memory                           # interactive with memory context
+```
 
 ---
 
@@ -158,11 +175,6 @@ Connectors follow the same pattern — see `gemini-memory` in `~/.local/bin/`.
 ---
 
 ## Roadmap
-
-**V2 — Auto-setup & more connectors**
-- [ ] `memory setup` — auto-detect all major AI CLIs
-- [ ] Copilot CLI connector
-- [ ] `aichat` / `sgpt` connectors
 
 **V3 — Bidirectional (write from any CLI)**
 - [ ] Post-session harvest: log sessions, extract memories with `memory harvest <logfile>`
