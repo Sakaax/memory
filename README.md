@@ -88,6 +88,25 @@ Stored as `knowledge / session` with a date prefix: `[session 2026-02-28] ...`
 
 **Note on context compaction:** if the AI's context was compacted mid-session, it can only summarize what it remembers since then. Calling `memory resume` (or individual `memory remember`) incrementally during a session avoids this limitation.
 
+### Harvest
+
+Extract memories from a past session transcript — no AI API call, no extra tokens.
+
+```bash
+memory harvest --last              # most recent Claude Code session (auto-detect)
+memory harvest session.jsonl       # explicit Claude Code session file
+memory harvest transcript.txt      # any plain text transcript (any AI)
+```
+
+**How it works:**
+
+- `.jsonl` mode (Claude Code): parses the session file structurally — detects `memory remember` bash calls already executed, and scans user messages for preference/decision patterns (`I use`, `I prefer`, `always use`, `my stack`, etc.)
+- Plain text mode: same heuristic patterns applied line by line — works with any transcript you paste or export manually
+
+An interactive selector lets you review and pick which candidates to store before anything is written. Harvested memories are stored with `confidence: 0.6` to reflect their inferred origin.
+
+**Note:** `--last` is Claude Code only — it walks `~/.claude/projects/` to find the newest session. For other AIs, use write-back during the session instead.
+
 ### Recall
 
 ```bash
@@ -474,7 +493,6 @@ memory/
 ## Roadmap
 
 **Next**
-- [ ] `memory harvest` — extract memories from a session transcript
 - [ ] `memoryd` — background daemon with HTTP API
 
 **Later**
@@ -483,11 +501,12 @@ memory/
 - [ ] Device sync — opt-in, encrypted
 
 **Done**
+- [x] `memory harvest` — extract memories from session transcripts (heuristic, no AI call)
 - [x] AI write-back — AIs store memories autonomously via injected context
 - [x] `memory resume` — AIs store session summaries at end of conversation
 - [x] Project-scoped connectors — `gemini-memory-myapp` injects only project memories
 - [x] Scopes — independent memory contexts per project (`create` / `use` / `delete`)
-- [x] Local UI — scope switcher, move memory between scopes, delete scope
+- [x] Local UI — scope switcher, move memory between scopes, delete scope, custom confirm modals, card dropdown menu
 - [x] Hooks — local scripts triggered on memory events
 - [x] Watch — live memory change stream
 - [x] 11 connectors — Claude, Gemini, Codex, OpenCode, Aider, ShellGPT, Goose, Groq, Ollama, Cursor Agent, Droid
