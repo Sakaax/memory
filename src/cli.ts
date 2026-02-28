@@ -261,12 +261,14 @@ function cmdContext(): void {
 // ─── setup ───────────────────────────────────────────────────────────────────
 
 // mode: how to inject memory context into the CLI
-//   flag      → CLI accepts an interactive-start flag: `cli <flag> "<context>"`
-//   positional → CLI accepts context as first positional arg: `cli "<context>"`
-//   stdin      → pipe context via stdin
-const SUPPORTED_CONNECTORS: Array<{ name: string; bin: string; mode: "flag" | "positional" | "stdin"; flag?: string }> = [
-  { name: "gemini", bin: join(BUN_BIN, "gemini"), mode: "flag",       flag: "-i" },
-  { name: "codex",  bin: join(BUN_BIN, "codex"),  mode: "positional"             },
+//   flag          → `cli <flag> "<context>"`            (gemini -i)
+//   system-prompt → `cli --append-system-prompt "<ctx>"` (claude)
+//   positional    → `cli "<context>"`                   (codex)
+//   stdin         → pipe context via stdin
+const SUPPORTED_CONNECTORS: Array<{ name: string; bin: string; mode: "flag" | "system-prompt" | "positional" | "stdin"; flag?: string }> = [
+  { name: "gemini", bin: join(BUN_BIN, "gemini"), mode: "flag",          flag: "-i"                    },
+  { name: "claude", bin: join(BUN_BIN, "claude"), mode: "system-prompt", flag: "--append-system-prompt" },
+  { name: "codex",  bin: join(BUN_BIN, "codex"),  mode: "positional"                                   },
 ]
 
 function isAvailable(bin: string): boolean {
@@ -291,12 +293,20 @@ function ensureInPath(rc: string, dir: string, label: string): boolean {
 
 function makeWrapper(binPath: string, mode: string, flag?: string): string {
   let interactiveCmd: string
-  if (mode === "flag" && flag) {
-    interactiveCmd = `exec "${binPath}" "${flag}" "$CONTEXT"`
+  let nonInteractiveCmd: string
+
+  if (mode === "system-prompt" && flag) {
+    interactiveCmd    = `exec "${binPath}" "${flag}" "$CONTEXT"`
+    nonInteractiveCmd = `"${binPath}" -p "${flag}" "$CONTEXT" "$*"`
+  } else if (mode === "flag" && flag) {
+    interactiveCmd    = `exec "${binPath}" "${flag}" "$CONTEXT"`
+    nonInteractiveCmd = `printf '%s\\n\\nUser query: %s\\n' "$CONTEXT" "$*" | "${binPath}" -p "$*"`
   } else if (mode === "positional") {
-    interactiveCmd = `exec "${binPath}" "$CONTEXT"`
+    interactiveCmd    = `exec "${binPath}" "$CONTEXT"`
+    nonInteractiveCmd = `printf '%s\\n\\nUser query: %s\\n' "$CONTEXT" "$*" | "${binPath}" -p "$*"`
   } else {
-    interactiveCmd = `printf '%s\\n\\n' "$CONTEXT" | exec "${binPath}"`
+    interactiveCmd    = `printf '%s\\n\\n' "$CONTEXT" | exec "${binPath}"`
+    nonInteractiveCmd = `printf '%s\\n\\nUser query: %s\\n' "$CONTEXT" "$*" | "${binPath}" -p "$*"`
   }
 
   return `#!/usr/bin/env bash
@@ -306,7 +316,7 @@ CONTEXT=$("$MEMORY_DIR/memory" context 2>/dev/null)
 if [ -z "$CONTEXT" ]; then
   exec "${binPath}" "$@"
 elif [ "$#" -gt 0 ]; then
-  printf '%s\\n\\nUser query: %s\\n' "$CONTEXT" "$*" | "${binPath}" -p "$*"
+  ${nonInteractiveCmd}
 else
   ${interactiveCmd}
 fi
