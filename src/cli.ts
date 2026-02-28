@@ -192,32 +192,52 @@ function cmdForget(args: string[]): void {
 
 function cmdContext(): void {
   const store = loadStore()
-
-  if (store.memories.length === 0) return
-
-  const sorted = [...store.memories].sort(
-    (a, b) => b.importance - a.importance || b.confidence - a.confidence
-  )
-
-  const grouped = sorted.reduce<Record<string, Memory[]>>((acc, m) => {
-    acc[m.domain] = [...(acc[m.domain] ?? []), m]
-    return acc
-  }, {})
+  const scope = readCurrentScope()
+  const file  = scopeFile(scope)
 
   const lines: string[] = [
     "=== USER MEMORY CONTEXT ===",
     "Background knowledge about the user. Use silently — do not repeat back unless asked.\n",
   ]
 
-  for (const [domain, memories] of Object.entries(grouped)) {
-    lines.push(`[${domain.toUpperCase()}]`)
-    for (const m of memories) {
-      lines.push(`- (${m.type}) ${m.content}`)
+  if (store.memories.length > 0) {
+    const sorted = [...store.memories].sort(
+      (a, b) => b.importance - a.importance || b.confidence - a.confidence
+    )
+
+    const grouped = sorted.reduce<Record<string, Memory[]>>((acc, m) => {
+      acc[m.domain] = [...(acc[m.domain] ?? []), m]
+      return acc
+    }, {})
+
+    for (const [domain, memories] of Object.entries(grouped)) {
+      lines.push(`[${domain.toUpperCase()}]`)
+      for (const m of memories) {
+        lines.push(`- (${m.type}) ${m.content}`)
+      }
+      lines.push("")
     }
-    lines.push("")
+  } else {
+    lines.push("(no memories stored yet)\n")
   }
 
   lines.push("=== END MEMORY CONTEXT ===")
+  lines.push("")
+  lines.push("=== MEMORY WRITE-BACK ===")
+  lines.push("You can store new memories permanently in the shared memory store.")
+  lines.push("Do this proactively when you learn something worth remembering about the user's")
+  lines.push("preferences, stack, decisions, or project context — without being asked.")
+  lines.push("")
+  lines.push("Command:")
+  lines.push(`  memory remember "<content>" --type <type> --domain <domain>`)
+  lines.push("")
+  lines.push(`Types: ${VALID_TYPES.join(" · ")}`)
+  lines.push(`Scope: ${scope}  |  File: ${file}`)
+  lines.push("")
+  lines.push("If you have shell access (e.g. Bash tool), run the command directly.")
+  lines.push("Otherwise, output the command for the user to run.")
+  lines.push("=== END WRITE-BACK ===")
+
   console.log(lines.join("\n"))
 }
 
