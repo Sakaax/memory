@@ -9,11 +9,57 @@ import { runHook } from "../hooks"
 
 const STATIC_DIR = join(import.meta.dir, "static")
 
+const CORS = {
+  "Access-Control-Allow-Origin":  "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+}
+
 export async function handleRequest(req: Request): Promise<Response> {
+  // CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: CORS })
+  }
+
+  const res = await _handleRequest(req)
+  // Attach CORS headers to every response
+  const headers = new Headers(res.headers)
+  for (const [k, v] of Object.entries(CORS)) headers.set(k, v)
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
+}
+
+async function _handleRequest(req: Request): Promise<Response> {
   const url = new URL(req.url)
   const { pathname } = url
 
   // ── API ──────────────────────────────────────────────────────────────────
+
+  // GET /api/context  — plain text context for browser extension injection
+  if (pathname === "/api/context" && req.method === "GET") {
+    const store = loadStore()
+    const scope = readCurrentScope()
+    const lines: string[] = [
+      "This is the user's persistent memory context. Use it silently as background knowledge.\n",
+    ]
+
+    if (store.memories.length > 0) {
+      const sorted  = [...store.memories].sort((a, b) => b.importance - a.importance || b.confidence - a.confidence)
+      const grouped = sorted.reduce<Record<string, typeof sorted>>((acc, m) => {
+        acc[m.domain] = [...(acc[m.domain] ?? []), m]
+        return acc
+      }, {})
+      for (const [domain, mems] of Object.entries(grouped)) {
+        lines.push(`[${domain.toUpperCase()}]`)
+        for (const m of mems) lines.push(`- (${m.type}) ${m.content}`)
+        lines.push("")
+      }
+    } else {
+      lines.push("(no memories stored yet)")
+    }
+
+    lines.push(`scope: ${scope}`)
+    return new Response(lines.join("\n"), { headers: { "Content-Type": "text/plain; charset=utf-8" } })
+  }
 
   // GET /api/scopes
   if (pathname === "/api/scopes" && req.method === "GET") {

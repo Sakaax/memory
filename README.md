@@ -437,6 +437,62 @@ Press `Ctrl+C` to stop the server. No background process.
 
 ---
 
+## Browser Extension
+
+Inject your memory context into any web AI interface — Claude.ai, ChatGPT, Gemini — with a single click.
+
+100% local: the extension talks to your local server (`localhost:7711`). Nothing leaves your machine.
+
+### Prerequisites
+
+The local server must be running:
+
+```bash
+memory ui
+```
+
+### Install
+
+**Chrome / Brave / Arc:**
+1. Go to `chrome://extensions`
+2. Enable **Developer mode** (top right)
+3. Click **Load unpacked**
+4. Select the `extension/` folder in this repo
+
+**Firefox:**
+1. Go to `about:debugging`
+2. Click **This Firefox** → **Load Temporary Add-on**
+3. Select `extension/manifest.json`
+
+### Usage
+
+A floating **⊕ memory** button appears at the bottom-left of supported AI sites.
+
+- **Green dot** — server is running, ready to inject
+- **Red dot** — server offline, run `memory ui` first
+- **Click the button** — fetches your memory context and prepends it to the chat input
+
+The popup (extension icon in toolbar) shows:
+- Server status + active scope + memory count
+- **Inject context** button
+- **Open memory UI** link
+
+### Supported sites
+
+| Site | URL |
+|---|---|
+| Claude.ai | `claude.ai` |
+| ChatGPT | `chat.openai.com` / `chatgpt.com` |
+| Gemini | `gemini.google.com` |
+
+Adding support for a new site = adding its URL to `host_permissions` in `manifest.json` and reloading the extension.
+
+### Why a button and not syntax?
+
+Web AIs have their own built-in memory (`ChatGPT Memory`, `Claude Memory`...). Typing `@memory` or `read memory` would be interpreted by the AI's own system, not yours. A button is unambiguous.
+
+---
+
 ## Memory schema
 
 ```json
@@ -469,9 +525,14 @@ memory/
 │   ├── hooks.ts            hook runner (fire-and-forget)
 │   └── ui/
 │       ├── server.ts       Bun HTTP server (127.0.0.1:7711)
-│       ├── routes.ts       API routes
+│       ├── routes.ts       API routes (CORS-enabled)
 │       └── static/
 │           └── index.html  local web interface
+└── extension/
+    ├── manifest.json       MV3 — Chrome, Brave, Arc, Firefox
+    ├── content.js          floating inject button on AI sites
+    ├── popup.html          toolbar popup
+    └── popup.js            popup logic
 ```
 
 **Runtime directory** (`~/.memory/` by default, override with `MEMORY_HOME`):
@@ -493,14 +554,16 @@ memory/
 ## Roadmap
 
 **Next**
-- [ ] `memoryd` — background daemon with HTTP API
+- [ ] `memoryd` — background daemon (no need to keep `memory ui` open for the extension)
+- [ ] Extension icons + Chrome Web Store / Firefox Add-ons listing
 
 **Later**
+- [ ] Mobile app — persistent memory on phone (local-only)
 - [ ] Confidence decay — memories fade without reinforcement
-- [ ] Web SDK — JS library for browser integration
 - [ ] Device sync — opt-in, encrypted
 
 **Done**
+- [x] Browser extension — inject memory into Claude.ai, ChatGPT, Gemini (MV3, Chrome + Firefox)
 - [x] `memory harvest` — extract memories from session transcripts (heuristic, no AI call)
 - [x] AI write-back — AIs store memories autonomously via injected context
 - [x] `memory resume` — AIs store session summaries at end of conversation
