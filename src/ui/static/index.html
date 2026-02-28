@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>memory</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0a0a0a;
+      --surface:  #111111;
+      --surface2: #1a1a1a;
+      --border:   #222222;
+      --border2:  #2e2e2e;
+      --text:     #eeeeee;
+      --dim:      #555555;
+      --dim2:     #888888;
+      --accent:   #4ade80;
+      --danger:   #f87171;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    /* ── Header ────────────────────────────────────── */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 12px 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo {
+      font-family: monospace;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+
+    .search-wrap { flex: 1; }
+
+    #search {
+      width: 100%;
+      max-width: 440px;
+      padding: 7px 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    #search::placeholder { color: var(--dim); }
+    #search:focus { border-color: var(--border2); }
+
+    .meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--dim2);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .icon-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--dim2);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 5px 10px;
+      border-radius: 7px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .icon-btn:hover { color: var(--text); border-color: var(--border2); }
+
+    /* ── Grid ──────────────────────────────────────── */
+    main {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 14px;
+      padding: 20px 24px;
+    }
+
+    .empty {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 80px 24px;
+      color: var(--dim);
+      font-size: 13px;
+    }
+
+    /* ── Card ──────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: border-color 0.15s, transform 0.1s;
+    }
+    .card:hover { border-color: var(--border2); }
+    .card:active { transform: scale(0.995); }
+
+    .card-head {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 22px;
+    }
+
+    .badge {
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+
+    .type-badge {
+      background: color-mix(in srgb, var(--color) 18%, transparent);
+      color: var(--color);
+      border: 1px solid color-mix(in srgb, var(--color) 30%, transparent);
+    }
+
+    .domain-badge {
+      background: var(--surface2);
+      color: var(--dim2);
+      border: 1px solid var(--border);
+      font-family: monospace;
+      font-size: 11px;
+    }
+
+    .del-btn {
+      margin-left: auto;
+      background: none;
+      border: none;
+      color: var(--dim);
+      cursor: pointer;
+      font-size: 12px;
+      padding: 3px 7px;
+      border-radius: 5px;
+      opacity: 0;
+      transition: opacity 0.15s, color 0.15s, background 0.15s;
+    }
+    .card:hover .del-btn { opacity: 1; }
+    .del-btn:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+
+    .card-content {
+      font-size: 13.5px;
+      line-height: 1.55;
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    .card-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .conf-wrap {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .conf-track {
+      width: 56px;
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .conf-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+    }
+
+    .conf-label {
+      font-size: 11px;
+      font-family: monospace;
+      color: var(--dim2);
+    }
+
+    .date {
+      font-size: 11px;
+      color: var(--dim);
+    }
+
+    /* ── Modal ─────────────────────────────────────── */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      backdrop-filter: blur(3px);
+      padding: 16px;
+    }
+    .overlay.hidden { display: none; }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 16px;
+      padding: 22px 24px;
+      width: 100%;
+      max-width: 460px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      color: var(--dim);
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+      padding: 2px 6px;
+      border-radius: 5px;
+    }
+    .close-btn:hover { color: var(--text); }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--dim2);
+    }
+
+    textarea, input[type="text"], select {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 13px;
+      padding: 8px 11px;
+      outline: none;
+      font-family: inherit;
+      transition: border-color 0.15s;
+      width: 100%;
+    }
+    textarea:focus, input[type="text"]:focus, select:focus { border-color: var(--border2); }
+    textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
+    select { cursor: pointer; }
+
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    input[type="range"] {
+      flex: 1;
+      padding: 0;
+      background: none;
+      border: none;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .slider-val {
+      font-family: monospace;
+      font-size: 12px;
+      color: var(--text);
+      width: 30px;
+      text-align: right;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      padding-top: 4px;
+    }
+
+    .btn {
+      cursor: pointer;
+      font-size: 13px;
+      font-family: inherit;
+      border-radius: 8px;
+      padding: 7px 16px;
+      border: 1px solid var(--border);
+      transition: background 0.15s, opacity 0.15s;
+      font-weight: 500;
+    }
+
+    .btn-ghost {
+      background: var(--surface2);
+      color: var(--dim2);
+    }
+    .btn-ghost:hover { background: var(--border); color: var(--text); }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #000;
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+    .btn-primary:hover { opacity: 0.88; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">memory</div>
+    <div class="search-wrap">
+      <input type="search" id="search" placeholder="Search memories…" autocomplete="off" />
+    </div>
+    <div class="meta">
+      <span id="count">—</span>
+      <button class="icon-btn" id="refresh" title="Refresh">↻</button>
+    </div>
+  </header>
+
+  <main id="grid"></main>
+
+  <!-- Edit modal -->
+  <div class="overlay hidden" id="overlay">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-head">
+        <span class="modal-title">Edit memory</span>
+        <button class="close-btn" id="close-modal">✕</button>
+      </div>
+
+      <div class="field">
+        <span class="field-label">Content</span>
+        <textarea id="edit-content" rows="3"></textarea>
+      </div>
+
+      <div class="row-2">
+        <div class="field">
+          <span class="field-label">Type</span>
+          <select id="edit-type"></select>
+        </div>
+        <div class="field">
+          <span class="field-label">Domain</span>
+          <input type="text" id="edit-domain" />
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="field-label">Importance</span>
+        <div class="slider-row">
+          <input type="range" id="edit-importance" min="0" max="1" step="0.1" />
+          <span class="slider-val" id="importance-val">0.5</span>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="btn-cancel">Cancel</button>
+        <button class="btn btn-primary" id="btn-save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const TYPES = ['preference','knowledge','project','decision','skill','relationship','goal','constraint']
+
+    const TYPE_COLORS = {
+      preference:   '#818cf8',
+      knowledge:    '#38bdf8',
+      project:      '#fb923c',
+      decision:     '#f472b6',
+      skill:        '#34d399',
+      relationship: '#a78bfa',
+      goal:         '#facc15',
+      constraint:   '#f87171',
+    }
+
+    // ── Populate type select ────────────────────────
+    const typeSelect = document.getElementById('edit-type')
+    TYPES.forEach(t => {
+      const opt = document.createElement('option')
+      opt.value = t
+      opt.textContent = t
+      typeSelect.appendChild(opt)
+    })
+
+    // ── State ───────────────────────────────────────
+    let editingId = null
+
+    // ── Load & render ───────────────────────────────
+    async function load(q = '') {
+      const url = q ? `/api/memories?q=${encodeURIComponent(q)}` : '/api/memories'
+      const memories = await fetch(url).then(r => r.json())
+      render(memories)
+    }
+
+    function render(memories) {
+      const grid = document.getElementById('grid')
+      const count = document.getElementById('count')
+      count.textContent = `${memories.length} memor${memories.length === 1 ? 'y' : 'ies'}`
+
+      if (memories.length === 0) {
+        grid.innerHTML = '<div class="empty">No memories found.</div>'
+        return
+      }
+
+      grid.innerHTML = memories.map(m => `
+        <div class="card" data-id="${m.id}">
+          <div class="card-head">
+            <span class="badge type-badge" style="--color:${TYPE_COLORS[m.type] || '#888'}">${m.type}</span>
+            <span class="badge domain-badge">${esc(m.domain)}</span>
+            <button class="del-btn" data-id="${m.id}" title="Delete">✕</button>
+          </div>
+          <div class="card-content">${esc(m.content)}</div>
+          <div class="card-foot">
+            <div class="conf-wrap">
+              <div class="conf-track"><div class="conf-fill" style="width:${m.confidence * 100}%"></div></div>
+              <span class="conf-label">${Math.round(m.confidence * 100)}%</span>
+            </div>
+            <span class="date">${fmt(m.created_at)}</span>
+          </div>
+        </div>
+      `).join('')
+
+      grid.querySelectorAll('.del-btn').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation()
+          deleteMemory(btn.dataset.id)
+        })
+      })
+
+      grid.querySelectorAll('.card').forEach(card => {
+        card.addEventListener('click', () => openEdit(card.dataset.id))
+      })
+    }
+
+    // ── Delete ──────────────────────────────────────
+    async function deleteMemory(id) {
+      await fetch(`/api/memories/${id}`, { method: 'DELETE' })
+      load(document.getElementById('search').value)
+    }
+
+    // ── Edit modal ──────────────────────────────────
+    let cachedMemories = []
+
+    async function openEdit(id) {
+      const memories = await fetch('/api/memories').then(r => r.json())
+      cachedMemories = memories
+      const m = memories.find(x => x.id === id)
+      if (!m) return
+
+      editingId = id
+      document.getElementById('edit-content').value = m.content
+      document.getElementById('edit-domain').value = m.domain
+      document.getElementById('edit-type').value = m.type
+      document.getElementById('edit-importance').value = m.importance
+      document.getElementById('importance-val').textContent = m.importance.toFixed(1)
+      document.getElementById('overlay').classList.remove('hidden')
+      document.getElementById('edit-content').focus()
+    }
+
+    function closeModal() {
+      document.getElementById('overlay').classList.add('hidden')
+      editingId = null
+    }
+
+    async function saveEdit() {
+      if (!editingId) return
+      const body = {
+        content:    document.getElementById('edit-content').value.trim(),
+        type:       document.getElementById('edit-type').value,
+        domain:     document.getElementById('edit-domain').value.trim(),
+        importance: parseFloat(document.getElementById('edit-importance').value),
+      }
+      await fetch(`/api/memories/${editingId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      closeModal()
+      load(document.getElementById('search').value)
+    }
+
+    // ── Utils ───────────────────────────────────────
+    function esc(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+    }
+
+    function fmt(iso) {
+      return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    }
+
+    // ── Events ──────────────────────────────────────
+    let searchTimer
+    document.getElementById('search').addEventListener('input', e => {
+      clearTimeout(searchTimer)
+      searchTimer = setTimeout(() => load(e.target.value), 180)
+    })
+
+    document.getElementById('refresh').addEventListener('click', () =>
+      load(document.getElementById('search').value)
+    )
+
+    document.getElementById('edit-importance').addEventListener('input', e => {
+      document.getElementById('importance-val').textContent = parseFloat(e.target.value).toFixed(1)
+    })
+
+    document.getElementById('btn-save').addEventListener('click', saveEdit)
+    document.getElementById('btn-cancel').addEventListener('click', closeModal)
+    document.getElementById('close-modal').addEventListener('click', closeModal)
+
+    document.getElementById('overlay').addEventListener('click', e => {
+      if (e.target === e.currentTarget) closeModal()
+    })
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeModal()
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') saveEdit()
+    })
+
+    // ── Init ────────────────────────────────────────
+    load()
+  </script>
+</body>
+</html>

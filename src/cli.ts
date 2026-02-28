@@ -1,60 +1,12 @@
 #!/usr/bin/env bun
-import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, symlinkSync, unlinkSync } from "fs"
+import { existsSync, mkdirSync, appendFileSync, symlinkSync, unlinkSync, readFileSync, writeFileSync } from "fs"
 import { join } from "path"
+import { loadStore, saveStore, VALID_TYPES, MEMORY_FILE, type Memory, type MemoryType } from "./store"
 
-const MEMORY_FILE = join(import.meta.dir, "../memory.json")
 const INSTALL_DIR = join(import.meta.dir, "..")
 const HOME = process.env.HOME ?? ""
 const LOCAL_BIN = join(HOME, ".local/bin")
 const BUN_BIN = join(HOME, ".bun/bin")
-
-type MemoryType =
-  | "preference"
-  | "knowledge"
-  | "project"
-  | "decision"
-  | "skill"
-  | "relationship"
-  | "goal"
-  | "constraint"
-
-const VALID_TYPES: MemoryType[] = [
-  "preference",
-  "knowledge",
-  "project",
-  "decision",
-  "skill",
-  "relationship",
-  "goal",
-  "constraint",
-]
-
-interface Memory {
-  id: string
-  type: MemoryType
-  content: string
-  domain: string
-  confidence: number
-  importance: number
-  source: "cli" | "ai"
-  created_at: string
-  updated_at: string
-}
-
-interface MemoryStore {
-  memories: Memory[]
-}
-
-function loadStore(): MemoryStore {
-  if (!existsSync(MEMORY_FILE)) {
-    return { memories: [] }
-  }
-  return JSON.parse(readFileSync(MEMORY_FILE, "utf-8")) as MemoryStore
-}
-
-function saveStore(store: MemoryStore): void {
-  writeFileSync(MEMORY_FILE, JSON.stringify(store, null, 2) + "\n")
-}
 
 function parseFlags(args: string[]): {
   content: string
@@ -437,6 +389,29 @@ async function cmdSetup(): Promise<void> {
   outro(`${c.dim}Reload shell: source ${rc}${c.reset}`)
 }
 
+async function cmdUI(): Promise<void> {
+  const { startServer, PORT } = await import("./ui/server")
+  const url = `http://127.0.0.1:${PORT}`
+
+  const server = startServer()
+
+  // Auto-open browser
+  const opener = process.platform === "darwin" ? "open" : "xdg-open"
+  Bun.spawnSync([opener, url])
+
+  console.log(`\n  ${c.cyan}${c.bold}memory ui${c.reset}  →  ${c.green}${url}${c.reset}`)
+  console.log(`  ${c.dim}Press Ctrl+C to stop${c.reset}\n`)
+
+  process.on("SIGINT", () => {
+    server.stop()
+    console.log(`\n  ${c.dim}memory ui stopped${c.reset}`)
+    process.exit(0)
+  })
+
+  // Keep process alive
+  await new Promise(() => {})
+}
+
 async function cmdUninstall(): Promise<void> {
   const { intro, outro, multiselect, spinner, note, isCancel } = await import("@clack/prompts")
 
@@ -510,6 +485,7 @@ ${c.bold}COMMANDS${c.reset}
   ${c.green}dump${c.reset}       Export all memories as JSON.
   ${c.green}setup${c.reset}      Configure AI CLI connectors interactively.
   ${c.green}uninstall${c.reset}  Remove connectors interactively.
+  ${c.green}ui${c.reset}         Launch local web interface at http://127.0.0.1:7711.
 
 ${c.bold}TYPES${c.reset}
   ${c.dim}${VALID_TYPES.join(" · ")}${c.reset}
@@ -534,6 +510,7 @@ switch (command) {
   case "context":   cmdContext();                         break
   case "setup":     cmdSetup().catch(console.error);      break
   case "uninstall": cmdUninstall().catch(console.error);  break
+  case "ui":        cmdUI().catch(console.error);         break
   case "help":
   default:          cmdHelp()
 }
