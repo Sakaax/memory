@@ -260,6 +260,35 @@ function cmdContext(): void {
 
 // ─── setup ───────────────────────────────────────────────────────────────────
 
+// ─── colors (no dep) ─────────────────────────────────────────────────────────
+
+const c = {
+  bold:   "\x1b[1m",
+  dim:    "\x1b[2m",
+  green:  "\x1b[32m",
+  cyan:   "\x1b[36m",
+  yellow: "\x1b[33m",
+  reset:  "\x1b[0m",
+}
+
+const CONNECTOR_HINTS: Record<string, string> = {
+  gemini: "Google Gemini CLI",
+  claude: "Claude Code CLI",
+  codex:  "OpenAI Codex CLI",
+}
+
+function printMemoryAscii(): void {
+  const art = [
+    "███╗   ███╗███████╗███╗   ███╗ ██████╗ ██████╗ ██╗   ██╗",
+    "████╗ ████║██╔════╝████╗ ████║██╔═══██╗██╔══██╗╚██╗ ██╔╝",
+    "██╔████╔██║█████╗  ██╔████╔██║██║   ██║██████╔╝ ╚████╔╝ ",
+    "██║╚██╔╝██║██╔══╝  ██║╚██╔╝██║██║   ██║██╔══██╗  ╚██╔╝  ",
+    "██║ ╚═╝ ██║███████╗██║ ╚═╝ ██║╚██████╔╝██║  ██║   ██║   ",
+    "╚═╝     ╚═╝╚══════╝╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝  ",
+  ]
+  console.log(`\n${c.cyan}${c.bold}${art.join("\n")}${c.reset}\n`)
+}
+
 // mode: how to inject memory context into the CLI
 //   flag          → `cli <flag> "<context>"`            (gemini -i)
 //   system-prompt → `cli --append-system-prompt "<ctx>"` (claude)
@@ -323,130 +352,135 @@ fi
 `
 }
 
-function cmdSetup(): void {
-  console.log("memory setup\n")
+async function cmdSetup(): Promise<void> {
+  const { intro, outro, multiselect, spinner, note, isCancel } = await import("@clack/prompts")
 
-  // 1. Create ~/.local/bin
-  if (!existsSync(LOCAL_BIN)) {
-    mkdirSync(LOCAL_BIN, { recursive: true })
-    console.log(`✓ Created ${LOCAL_BIN}`)
+  intro(`${c.bold}  memory setup  ${c.reset}`)
+
+  // 1. Detect available CLIs
+  const available = SUPPORTED_CONNECTORS.filter(
+    (conn) => isAvailable(conn.bin) || isAvailable(conn.name)
+  )
+
+  if (available.length === 0) {
+    note("No supported AI CLIs found.\nInstall gemini, claude, or codex first.", "Warning")
+    outro("Nothing to configure.")
+    return
   }
 
-  // 2. Symlink memory binary
+  // 2. Interactive multi-select
+  const selected = await multiselect({
+    message: "Select connectors to install:",
+    options: available.map((conn) => ({
+      value: conn.name,
+      label: `${c.bold}${conn.name}${c.reset}`,
+      hint:  CONNECTOR_HINTS[conn.name] ?? conn.name,
+    })),
+    initialValues: available.map((conn) => conn.name),
+  })
+
+  if (isCancel(selected) || (selected as string[]).length === 0) {
+    outro("Setup cancelled.")
+    return
+  }
+
+  const selectedNames = selected as string[]
+
+  // 3. Base setup
+  const s = spinner()
+  s.start("Configuring base install...")
+
+  if (!existsSync(LOCAL_BIN)) mkdirSync(LOCAL_BIN, { recursive: true })
+
   const memoryLink = join(LOCAL_BIN, "memory")
-  const memoryScript = join(INSTALL_DIR, "memory")
-  if (existsSync(memoryLink)) {
-    unlinkSync(memoryLink)
-  }
-  symlinkSync(memoryScript, memoryLink)
-  console.log(`✓ memory → ${memoryLink}`)
+  if (existsSync(memoryLink)) unlinkSync(memoryLink)
+  symlinkSync(join(INSTALL_DIR, "memory"), memoryLink)
 
-  // 3. Patch shell rc for PATH
   const rc = getShellRc()
-  const addedLocal = ensureInPath(rc, LOCAL_BIN, "local bin")
-  const addedBun = ensureInPath(rc, BUN_BIN, "bun bin")
-  if (addedLocal || addedBun) {
-    console.log(`✓ PATH updated in ${rc}`)
-  } else {
-    console.log(`  PATH already configured`)
+  ensureInPath(rc, LOCAL_BIN, "local bin")
+  ensureInPath(rc, BUN_BIN, "bun bin")
+
+  s.stop("Base install ready")
+
+  // 4. Install selected connectors
+  const installedNames: string[] = []
+
+  for (const name of selectedNames) {
+    const conn = SUPPORTED_CONNECTORS.find((c) => c.name === name)!
+    const cs = spinner()
+    cs.start(`Installing ${name}-memory...`)
+
+    const binPath = existsSync(conn.bin)
+      ? conn.bin
+      : new TextDecoder().decode(Bun.spawnSync(["which", conn.name]).stdout).trim()
+
+    writeFileSync(
+      join(LOCAL_BIN, `${name}-memory`),
+      makeWrapper(binPath, conn.mode, conn.flag),
+      { mode: 0o755 }
+    )
+
+    cs.stop(`${c.green}✓${c.reset} ${name}-memory`)
+    installedNames.push(name)
   }
 
-  // 4. Detect CLIs and generate wrappers
-  console.log("\nDetecting AI CLIs...")
-  const installed: string[] = []
-  const missing: string[] = []
+  // 5. Big ASCII art
+  printMemoryAscii()
 
-  for (const connector of SUPPORTED_CONNECTORS) {
-    if (isAvailable(connector.bin) || isAvailable(connector.name)) {
-      const binPath = existsSync(connector.bin)
-        ? connector.bin
-        : Bun.spawnSync(["which", connector.name]).stdout
-            ? new TextDecoder().decode(Bun.spawnSync(["which", connector.name]).stdout).trim()
-            : connector.bin
+  // 6. Show how to launch
+  const launchLines = installedNames
+    .map((n) => `  ${c.green}${c.bold}${n}-memory${c.reset}   →  launch ${n} with your memory context`)
+    .join("\n")
 
-      const wrapperPath = join(LOCAL_BIN, `${connector.name}-memory`)
-      writeFileSync(wrapperPath, makeWrapper(binPath, connector.mode, connector.flag), { mode: 0o755 })
-      console.log(`✓ ${connector.name}-memory wrapper installed`)
-      installed.push(connector.name)
-    } else {
-      console.log(`  ${connector.name} — not found (skipped)`)
-      missing.push(connector.name)
-    }
-  }
+  note(launchLines, "Ready to use")
 
-  // 5. Claude Code instructions (don't auto-modify global CLAUDE.md)
-  const claudeGlobal = join(HOME, ".claude/CLAUDE.md")
-  const alreadyConfigured = existsSync(claudeGlobal) &&
-    readFileSync(claudeGlobal, "utf-8").includes("memory.json")
-
-  console.log("\n── Claude Code ──────────────────────────────")
-  if (alreadyConfigured) {
-    console.log("  Already configured.")
-  } else {
-    console.log(`  Add this to ~/.claude/CLAUDE.md:\n`)
-    console.log(`  ## Memory Context`)
-    console.log(`  Before every response, read \`${MEMORY_FILE}\``)
-    console.log(`  and use stored memories as context.\n`)
-  }
-
-  // 6. Summary
-  console.log("─────────────────────────────────────────────")
-  if (installed.length > 0) {
-    console.log(`Connectors ready: ${installed.map((n) => `${n}-memory`).join(", ")}`)
-  }
-  if (missing.length > 0) {
-    console.log(`Not installed:    ${missing.join(", ")}`)
-  }
-  console.log(`\nReload shell: source ${rc}`)
+  outro(`${c.dim}Reload shell: source ${rc}${c.reset}`)
 }
 
 // ─── router ──────────────────────────────────────────────────────────────────
 
 function cmdHelp(): void {
-  console.log(`memory v0.2.0 — persistent cognitive layer
+  printMemoryAscii()
+  console.log(`${c.dim}Persistent cognitive layer for AI systems.${c.reset}
+${c.dim}Your context — everywhere.${c.reset}
 
-Commands:
-  remember "<content>" [--type <type>] [--domain <domain>] [--importance <0-1>]
-      Store a memory (updates confidence if duplicate)
+${c.bold}COMMANDS${c.reset}
 
-  recall [query]
-      Retrieve memories filtered by content/type/domain
+  ${c.green}remember${c.reset} ${c.dim}"<content>" [--type <type>] [--domain <domain>]${c.reset}
+      Store a memory. Repeating it increases confidence.
 
-  forget <id>
-      Delete a memory by id
+  ${c.green}recall${c.reset}   ${c.dim}[query]${c.reset}
+      Search memories by content, type or domain.
 
-  status
-      Show memory statistics
+  ${c.green}forget${c.reset}   ${c.dim}<id>${c.reset}
+      Delete a memory by id.
 
-  dump
-      Print all memories as JSON
+  ${c.green}status${c.reset}   Show statistics.
+  ${c.green}dump${c.reset}     Export all memories as JSON.
+  ${c.green}setup${c.reset}    Configure AI CLI connectors interactively.
 
-  context
-      Output formatted context (used internally by connectors)
+${c.bold}TYPES${c.reset}
+  ${c.dim}${VALID_TYPES.join(" · ")}${c.reset}
 
-  setup
-      Auto-detect AI CLIs and configure connectors
-
-Types: ${VALID_TYPES.join(" | ")}
-
-Examples:
-  memory remember "I use Bun for everything" --type preference --domain development
-  memory recall development
-  memory forget a1b2c3d4
-  memory setup`)
+${c.bold}EXAMPLES${c.reset}
+  ${c.dim}memory remember "I use Bun for everything" --type preference --domain development${c.reset}
+  ${c.dim}memory recall development${c.reset}
+  ${c.dim}memory forget a1b2c3d4${c.reset}
+  ${c.dim}memory setup${c.reset}
+`)
 }
 
 const args = process.argv.slice(2)
 const [command = "help", ...rest] = args
 
 switch (command) {
-  case "remember":  cmdRemember(rest); break
-  case "recall":    cmdRecall(rest);   break
-  case "dump":      cmdDump();         break
-  case "status":    cmdStatus();       break
-  case "forget":    cmdForget(rest);   break
-  case "context":   cmdContext();      break
-  case "setup":     cmdSetup();        break
+  case "remember":  cmdRemember(rest);                    break
+  case "recall":    cmdRecall(rest);                      break
+  case "dump":      cmdDump();                            break
+  case "status":    cmdStatus();                          break
+  case "forget":    cmdForget(rest);                      break
+  case "context":   cmdContext();                         break
+  case "setup":     cmdSetup().catch(console.error);      break
   case "help":
   default:          cmdHelp()
 }
