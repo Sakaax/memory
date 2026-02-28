@@ -190,6 +190,35 @@ function cmdForget(args: string[]): void {
   console.log(`Forgotten: [${id}]`)
 }
 
+function cmdResume(args: string[]): void {
+  const content = args[0]
+  if (!content) {
+    console.error('Usage: memory resume "<session summary>"')
+    process.exit(1)
+  }
+
+  const scope = readCurrentScope()
+  const date  = new Date().toISOString().slice(0, 10)
+  const store = loadStore()
+
+  const memory: Memory = {
+    id:         crypto.randomUUID().slice(0, 8),
+    type:       "knowledge",
+    content:    `[session ${date}] ${content}`,
+    domain:     "session",
+    confidence: 0.9,
+    importance: 0.7,
+    source:     "ai",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+
+  store.memories.push(memory)
+  saveStore(store)
+  runHook("on-memory-added", memory)
+  console.log(`Session summary stored: [${memory.id}] scope=${scope}`)
+}
+
 function cmdContext(): void {
   const store = loadStore()
   const scope = readCurrentScope()
@@ -228,6 +257,11 @@ function cmdContext(): void {
   lines.push("")
   lines.push("WRITE — store new memories proactively when you learn something worth remembering:")
   lines.push(`  memory remember "<content>" --type <type> --domain <domain>`)
+  lines.push("")
+  lines.push("RESUME — at end of session, store a summary of what was done:")
+  lines.push(`  memory resume "<summary of session goals, decisions, problems solved>"`)
+  lines.push("  Be concise. Cover what changed, what was decided, what was built.")
+  lines.push("  Note: if context was compacted mid-session, summarize what you remember since then.")
   lines.push("")
   lines.push("READ — refresh your context mid-session:")
   lines.push("  memory context           → full context (all memories, re-read at any time)")
@@ -341,10 +375,11 @@ function ensureInPath(rc: string, dir: string, label: string): boolean {
   return true
 }
 
-function makeWrapper(binPath: string, mode: string, flag?: string): string {
+function makeWrapper(binPath: string, mode: string, flag?: string, scopeOverride?: string): string {
+  const scopeLine = scopeOverride ? `export MEMORY_SCOPE="${scopeOverride}"\n` : ""
   const header = `#!/usr/bin/env bash
 MEMORY_DIR="${INSTALL_DIR}"
-CONTEXT=$("$MEMORY_DIR/memory" context 2>/dev/null)
+${scopeLine}CONTEXT=$("$MEMORY_DIR/memory" context 2>/dev/null)
 `
   // ── Modes with fully custom templates ───────────────────────────────────────
 
@@ -455,10 +490,20 @@ fi
 `
 }
 
-async function cmdSetup(): Promise<void> {
+async function cmdSetup(args: string[]): Promise<void> {
   const { intro, outro, multiselect, spinner, note, isCancel } = await import("@clack/prompts")
 
-  intro(`${c.bold}  memory setup  ${c.reset}`)
+  // Optional scope argument: `memory setup <scope>` creates project-specific connectors
+  const scopeArg = args[0] && !args[0].startsWith("--") ? args[0] : undefined
+  const suffix   = scopeArg ? `-${scopeArg}` : ""
+  const label    = scopeArg ? ` (scope: ${scopeArg})` : ""
+
+  if (scopeArg && !existsSync(scopeDir(scopeArg))) {
+    console.error(`Scope "${scopeArg}" not found. Run: memory scope create ${scopeArg}`)
+    process.exit(1)
+  }
+
+  intro(`${c.bold}  memory setup${label}  ${c.reset}`)
 
   // 1. Detect available CLIs
   const available = SUPPORTED_CONNECTORS.filter(
@@ -473,7 +518,7 @@ async function cmdSetup(): Promise<void> {
 
   // 2. Interactive multi-select
   const selected = await multiselect({
-    message: "Select connectors to install:",
+    message: `Select connectors to install${label}:`,
     options: available.map((conn) => ({
       value: conn.name,
       label: `${c.bold}${conn.name}${c.reset}`,
@@ -511,20 +556,21 @@ async function cmdSetup(): Promise<void> {
   for (const name of selectedNames) {
     const conn = SUPPORTED_CONNECTORS.find((c) => c.name === name)!
     const cs = spinner()
-    cs.start(`Installing ${name}-memory...`)
+    const wrapperName = `${name}-memory${suffix}`
+    cs.start(`Installing ${wrapperName}...`)
 
     const binPath = existsSync(conn.bin)
       ? conn.bin
       : new TextDecoder().decode(Bun.spawnSync(["which", conn.name]).stdout).trim()
 
     writeFileSync(
-      join(LOCAL_BIN, `${name}-memory`),
-      makeWrapper(binPath, conn.mode, conn.flag),
+      join(LOCAL_BIN, wrapperName),
+      makeWrapper(binPath, conn.mode, conn.flag, scopeArg),
       { mode: 0o755 }
     )
 
-    cs.stop(`${c.green}✓${c.reset} ${name}-memory`)
-    installedNames.push(name)
+    cs.stop(`${c.green}✓${c.reset} ${wrapperName}`)
+    installedNames.push(wrapperName)
   }
 
   // 5. Big ASCII art
@@ -779,6 +825,9 @@ ${c.bold}COMMANDS${c.reset}
   ${c.green}remember${c.reset} ${c.dim}"<content>" [--type <type>] [--domain <domain>]${c.reset}
       Store a memory. Repeating it increases confidence.
 
+  ${c.green}resume${c.reset}   ${c.dim}"<session summary>"${c.reset}
+      Store a session summary (for AIs to call at end of session).
+
   ${c.green}recall${c.reset}   ${c.dim}[query]${c.reset}
       Search memories by content, type or domain.
 
@@ -790,7 +839,7 @@ ${c.bold}COMMANDS${c.reset}
   ${c.green}watch${c.reset}      Stream live memory change events.
   ${c.green}doctor${c.reset}     Diagnose storage, permissions, and scopes.
   ${c.green}scope${c.reset}      ${c.dim}list | use <name> | create <name>${c.reset}
-  ${c.green}setup${c.reset}      Configure AI CLI connectors interactively.
+  ${c.green}setup${c.reset}      ${c.dim}[scope]${c.reset}  Configure connectors. Pass scope to create project-specific wrappers.
   ${c.green}uninstall${c.reset}  Remove connectors interactively.
   ${c.green}ui${c.reset}         Launch local web interface at http://127.0.0.1:7711.
 
@@ -799,9 +848,11 @@ ${c.bold}TYPES${c.reset}
 
 ${c.bold}EXAMPLES${c.reset}
   ${c.dim}memory remember "I use Bun for everything" --type preference --domain development${c.reset}
+  ${c.dim}memory resume "Built auth flow with NextAuth + Google OAuth, deployed on Railway"${c.reset}
   ${c.dim}memory recall development${c.reset}
   ${c.dim}memory forget a1b2c3d4${c.reset}
   ${c.dim}memory setup${c.reset}
+  ${c.dim}memory setup myproject    # project-specific connectors: gemini-memory-myproject${c.reset}
 `)
 }
 
@@ -809,18 +860,19 @@ const args = process.argv.slice(2)
 const [command = "help", ...rest] = args
 
 switch (command) {
-  case "remember":  cmdRemember(rest);                    break
-  case "recall":    cmdRecall(rest);                      break
-  case "dump":      cmdDump();                            break
-  case "status":    cmdStatus();                          break
-  case "forget":    cmdForget(rest);                      break
-  case "context":   cmdContext();                         break
-  case "watch":     cmdWatch().catch(console.error);      break
-  case "doctor":    cmdDoctor();                          break
-  case "scope":     cmdScope(rest);                       break
-  case "setup":     cmdSetup().catch(console.error);      break
-  case "uninstall": cmdUninstall().catch(console.error);  break
-  case "ui":        cmdUI().catch(console.error);         break
+  case "remember":  cmdRemember(rest);                         break
+  case "resume":    cmdResume(rest);                           break
+  case "recall":    cmdRecall(rest);                           break
+  case "dump":      cmdDump();                                 break
+  case "status":    cmdStatus();                               break
+  case "forget":    cmdForget(rest);                           break
+  case "context":   cmdContext();                              break
+  case "watch":     cmdWatch().catch(console.error);           break
+  case "doctor":    cmdDoctor();                               break
+  case "scope":     cmdScope(rest);                            break
+  case "setup":     cmdSetup(rest).catch(console.error);       break
+  case "uninstall": cmdUninstall().catch(console.error);       break
+  case "ui":        cmdUI().catch(console.error);              break
   case "help":
   default:          cmdHelp()
 }

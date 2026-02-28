@@ -76,6 +76,18 @@ Storing the same content twice increases confidence automatically.
 **Available types:**
 `preference` · `knowledge` · `project` · `decision` · `skill` · `relationship` · `goal` · `constraint`
 
+### Resume
+
+Store a session summary — designed to be called by AIs at the end of a session:
+
+```bash
+memory resume "Built auth flow with NextAuth + Google OAuth, deployed to Railway"
+```
+
+Stored as `knowledge / session` with a date prefix: `[session 2026-02-28] ...`
+
+**Note on context compaction:** if the AI's context was compacted mid-session, it can only summarize what it remembers since then. Calling `memory resume` (or individual `memory remember`) incrementally during a session avoids this limitation.
+
 ### Recall
 
 ```bash
@@ -254,7 +266,18 @@ memory recall <query>    # search by keyword, type, or domain
 
 ```bash
 memory setup                   # detect and install AI connectors interactively
+memory setup <scope>           # create project-specific connectors (e.g. gemini-memory-myapp)
 memory uninstall               # remove connectors interactively
+```
+
+Project-specific connectors only inject the memories from their scope:
+
+```bash
+memory scope create myapp
+memory setup myapp             # creates gemini-memory-myapp, claude-memory-myapp, etc.
+
+gemini-memory-myapp            # only knows about myapp memories
+gemini-memory                  # knows global memories
 ```
 
 ### Diagnostics
@@ -448,6 +471,8 @@ memory/
 
 **Done**
 - [x] AI write-back — AIs store memories autonomously via injected context
+- [x] `memory resume` — AIs store session summaries at end of conversation
+- [x] Project-scoped connectors — `gemini-memory-myapp` injects only project memories
 - [x] Scopes — independent memory contexts per project
 - [x] Hooks — local scripts triggered on memory events
 - [x] Watch — live memory change stream

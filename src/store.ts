@@ -19,6 +19,9 @@ export const CURRENT_SCOPE_FILE = join(MEMORY_HOME, "current_scope")
 // ── Scope helpers ─────────────────────────────────────────────────────────────
 
 export function readCurrentScope(): string {
+  // MEMORY_SCOPE env var has highest priority (used by project-specific connectors)
+  const envScope = process.env.MEMORY_SCOPE?.trim()
+  if (envScope) return envScope
   if (existsSync(CURRENT_SCOPE_FILE)) {
     const val = readFileSync(CURRENT_SCOPE_FILE, "utf-8").trim()
     if (val) return val
