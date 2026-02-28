@@ -1,35 +1,33 @@
 # memory
 
-> Persistent cognitive layer for AI systems.
+**Persistent cognitive layer for AI systems.**
 
-One JSON file. One CLI. Your context — everywhere.
+Your context. One file. Every AI.
 
 ---
 
 ## The problem
 
-Every AI resets. You explain yourself again and again.
-Claude doesn't know what Gemini learned yesterday.
-Gemini doesn't know what you told Claude this morning.
+Every AI session starts from zero.
+Claude doesn't know what you told Gemini.
+Gemini doesn't know what Codex learned.
+You keep re-explaining yourself.
 
-**memory** fixes this.
+**memory** solves this by giving every AI the same shared context — a single JSON file on your machine.
 
 ---
 
 ## How it works
 
 ```
-You
- ↓
-memory remember "I use Bun for everything"
- ↓
-memory.json  ←  single source of truth
- ↓         ↓         ↓
-Claude    Gemini    Codex    (any CLI)
+memory remember "I use Bun, never npm"
+        ↓
+   memory.json          ← single source of truth
+   ↙    ↓    ↘
+Claude  Gemini  Codex   ← all read the same context
 ```
 
-Each AI connector reads `memory.json` before responding.
-Your context persists across tools, sessions, and reboots.
+Context is injected at session start. No API calls. No cloud. No setup beyond the CLI.
 
 ---
 
@@ -39,26 +37,80 @@ Your context persists across tools, sessions, and reboots.
 curl -fsSL https://raw.githubusercontent.com/Sakaax/memory/main/install.sh | bash
 ```
 
-Or manually:
-
-```bash
-git clone https://github.com/Sakaax/memory ~/.memory
-cd ~/.memory && bun install
-./memory setup
-source ~/.zshrc
-```
-
-**Requirements:** [Bun](https://bun.sh) (auto-installed if missing), Git
-
----
-
-## Setup
+Then configure your AI connectors:
 
 ```bash
 memory setup
 ```
 
-Detects installed AI CLIs and shows an interactive list — select the connectors you want with `Space`, confirm with `Enter`. No manual config.
+Requires [Bun](https://bun.sh) — installed automatically if missing.
+
+**Manual install:**
+
+```bash
+git clone https://github.com/Sakaax/memory ~/.memory
+cd ~/.memory
+bun install
+./memory setup
+source ~/.zshrc
+```
+
+---
+
+## Commands
+
+### Store
+
+```bash
+memory remember "I use Bun, never npm or yarn" --type preference --domain development
+memory remember "My stack: Next.js 15, Neon, Prisma, Railway" --type knowledge --domain development
+memory remember "Ship fast — baby on the way" --type constraint --domain personal
+```
+
+Storing the same content twice increases confidence automatically.
+
+**Available types:**
+`preference` · `knowledge` · `project` · `decision` · `skill` · `relationship` · `goal` · `constraint`
+
+### Recall
+
+```bash
+memory recall                  # all memories
+memory recall development      # filter by domain, type, or keyword
+```
+
+### Manage
+
+```bash
+memory status                  # stats overview
+memory forget <id>             # delete by id
+memory dump                    # export full JSON
+```
+
+### Connectors
+
+```bash
+memory setup                   # detect and install AI connectors interactively
+memory uninstall               # remove connectors interactively
+```
+
+### UI
+
+```bash
+memory ui                      # open local web interface at http://127.0.0.1:7711
+```
+
+### Help
+
+```bash
+memory help
+```
+
+---
+
+## Setup
+
+`memory setup` detects which AI CLIs are installed and shows an interactive selector:
 
 ```
 ◆  Select connectors to install:
@@ -68,89 +120,67 @@ Detects installed AI CLIs and shows an interactive list — select the connector
 └
 ```
 
-When done, memory shows which commands to run:
+Press `Space` to toggle, `Enter` to confirm.
+
+After install, it shows exactly which commands to run:
 
 ```
-┌─ Ready to use ──────────────────────────┐
-│                                         │
-│  gemini-memory  →  launch gemini with your memory context
-│  claude-memory  →  launch claude with your memory context
-│  codex-memory   →  launch codex  with your memory context
-│                                         │
-└─────────────────────────────────────────┘
+┌─ Ready to use ────────────────────────────────────────────┐
+│                                                           │
+│  gemini-memory   →  launch gemini with your memory context│
+│  claude-memory   →  launch claude with your memory context│
+│  codex-memory    →  launch codex  with your memory context│
+│                                                           │
+└───────────────────────────────────────────────────────────┘
 ```
 
----
-
-## Uninstall connectors
+To remove connectors:
 
 ```bash
 memory uninstall
 ```
 
-Same interactive flow — select connectors to remove. Run `memory setup` to reinstall anytime.
-
----
-
-## Usage
-
-### Store a memory
-
-```bash
-memory remember "I use Bun, never npm or yarn" --type preference --domain development
-memory remember "My stack: Next.js 15, Neon, Prisma, Railway" --type knowledge --domain development
-memory remember "Baby due soon — keep it short and ship" --type constraint --domain personal
-```
-
-**Types:** `preference` · `knowledge` · `project` · `decision` · `skill` · `relationship` · `goal` · `constraint`
-
-### Recall memories
-
-```bash
-memory recall                  # all memories
-memory recall development      # filter by domain, type or content keyword
-```
-
-### Manage
-
-```bash
-memory status                  # stats
-memory forget <id>             # delete by id
-memory dump                    # raw JSON export
-```
-
-### Help
-
-```bash
-memory help
-```
-
-Displays all commands with the MEMORY banner.
+Same interface — select which wrappers to delete.
 
 ---
 
 ## Connectors
 
-### Claude Code
+Each connector is a shell wrapper in `~/.local/bin` that injects your memory context before the AI session starts.
+
+| Connector | Command | Injection method |
+|---|---|---|
+| Claude Code | `claude-memory` | `--append-system-prompt` |
+| Gemini CLI | `gemini-memory` | `-i` (interactive context) |
+| Codex CLI | `codex-memory` | positional argument |
+
+**Usage:**
 
 ```bash
-claude-memory                          # interactive with memory context
+gemini-memory                           # interactive session with memory
+claude-memory                           # interactive session with memory
+codex-memory                            # interactive session with memory
+
+gemini-memory "what runtime do I use?"  # one-shot query
 ```
 
-Context is injected via `--append-system-prompt`. No config file needed.
+---
 
-### Gemini CLI
+## Local UI
 
 ```bash
-gemini-memory                          # interactive REPL with memory context
-gemini-memory "what runtime do I use?" # one-shot
+memory ui
 ```
 
-### Codex CLI
+Opens a local web interface at `http://127.0.0.1:7711`.
 
-```bash
-codex-memory                           # interactive with memory context
-```
+- Browse all memories in a card grid
+- Live search by content, type, or domain
+- Edit memory content, type, domain, and importance
+- Delete memories
+- Confidence bar and date on each card
+
+Press `Ctrl+C` to stop the server. No background process.
 
 ---
 
@@ -170,21 +200,42 @@ codex-memory                           # interactive with memory context
 }
 ```
 
-`memory.json` is your file. It lives locally, never leaves your machine.
+`memory.json` stays on your machine. It is excluded from git by default.
+
+---
+
+## Project structure
+
+```
+memory/
+├── install.sh              one-liner installer
+├── memory                  shell wrapper (entry point)
+├── memory.json             your data (gitignored)
+├── src/
+│   ├── store.ts            shared data layer
+│   ├── cli.ts              all commands
+│   └── ui/
+│       ├── server.ts       Bun HTTP server (127.0.0.1:7711)
+│       ├── routes.ts       API routes
+│       └── static/
+│           └── index.html  local web interface
+└── docs/                   architecture and design notes
+```
 
 ---
 
 ## Roadmap
 
-**V3 — Bidirectional (write from any CLI)**
-- [ ] Post-session harvest: log sessions, extract memories with `memory harvest <logfile>`
-- [ ] In-session write: wrappers intercept `!remember <content>` in interactive mode
-- [ ] Confidence decay: memories fade without reinforcement
+**Next**
+- [ ] `memory harvest` — extract memories from a session transcript
+- [ ] In-session write — wrappers detect `!remember <content>` and store directly
+- [ ] More connectors — Copilot CLI, aichat, sgpt
 
-**V4 — Infrastructure**
-- [ ] `memoryd` daemon with HTTP API
-- [ ] Web SDK (JS)
-- [ ] Sync across devices (opt-in, encrypted)
+**Later**
+- [ ] `memoryd` — background daemon with HTTP API
+- [ ] Confidence decay — memories fade without reinforcement
+- [ ] Web SDK — JS library for browser integration
+- [ ] Device sync — opt-in, encrypted
 
 ---
 
@@ -192,11 +243,12 @@ codex-memory                           # interactive with memory context
 
 ```bash
 git clone https://github.com/Sakaax/memory
-cd memory && bun install
+cd memory
+bun install
 bun run src/cli.ts help
 ```
 
-PRs welcome. Keep it simple. No cloud dependencies.
+Keep it simple. No cloud. No heavy dependencies. PRs welcome.
 
 ---
 
