@@ -1,4 +1,5 @@
 const MEMORY_URL = 'http://localhost:7711'
+const ext = typeof browser !== 'undefined' ? browser : chrome
 
 // ── Textarea detection ────────────────────────────────────────────────────────
 const TEXTAREA_SELECTORS = [
@@ -69,7 +70,7 @@ async function openPicker(btnRect) {
   if (pickerOpen) { closePicker(); return }
 
   const res = await new Promise(resolve =>
-    chrome.runtime.sendMessage({ action: 'getScopes' }, resolve)
+    ext.runtime.sendMessage({ action: 'getScopes' }, resolve)
   )
   if (!res?.ok) {
     showToast('Cannot reach memory server — run: memory ui', true)
@@ -154,7 +155,7 @@ async function doInject(scope) {
   if (!textarea) { showToast('No input field found on this page.', true); return }
 
   const res = await new Promise(resolve =>
-    chrome.runtime.sendMessage({ action: 'getContext', scope }, resolve)
+    ext.runtime.sendMessage({ action: 'getContext', scope }, resolve)
   )
   if (!res?.ok) {
     showToast('Cannot reach memory server — run: memory ui', true)
@@ -170,7 +171,7 @@ async function doInject(scope) {
 async function checkServer() {
   const dot = document.getElementById('memory-dot')
   if (!dot) return
-  chrome.runtime.sendMessage({ action: 'getScopes' }, res => {
+  ext.runtime.sendMessage({ action: 'getScopes' }, res => {
     dot.style.background = res?.ok ? '#4ade80' : '#f87171'
   })
 }
@@ -225,7 +226,7 @@ function createButton() {
 }
 
 // ── Listen for inject from popup ─────────────────────────────────────────────
-chrome.runtime.onMessage.addListener((msg) => {
+ext.runtime.onMessage.addListener((msg) => {
   if (msg.action === 'inject' && msg.context) {
     const textarea = getTextarea()
     if (textarea) {

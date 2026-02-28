@@ -1,7 +1,8 @@
 const MEMORY_URL = 'http://localhost:7711'
+const ext = typeof browser !== 'undefined' ? browser : chrome
 
 // All fetch calls to localhost go through here — bypasses page CSP
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+ext.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.action === 'getScopes') {
     fetch(`${MEMORY_URL}/api/scopes`, { signal: AbortSignal.timeout(2000) })
       .then(r => r.json())

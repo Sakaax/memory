@@ -1,4 +1,5 @@
-const MEMORY_URL = 'http://localhost:7711'
+// Firefox uses browser.*, Chrome uses chrome.* — normalise
+const ext = typeof browser !== 'undefined' ? browser : chrome
 
 const dot        = document.getElementById('dot')
 const statusText = document.getElementById('status-text')
@@ -9,21 +10,22 @@ const btnInject  = document.getElementById('btn-inject')
 const btnUi      = document.getElementById('btn-ui')
 
 async function init() {
-  try {
-    const r = await fetch(`${MEMORY_URL}/api/scopes`, { signal: AbortSignal.timeout(2000) })
-    if (!r.ok) throw new Error()
-    const { scopes, active } = await r.json()
+  const res = await new Promise(resolve =>
+    ext.runtime.sendMessage({ action: 'getScopes' }, resolve)
+  )
 
+  if (res?.ok) {
+    const { scopes, active } = res.data
     const activeScope = scopes.find(s => s.name === active)
     const count       = activeScope?.count ?? 0
 
-    dot.className        = 'dot online'
+    dot.className          = 'dot online'
     statusText.textContent = 'connected'
-    scopeEl.textContent  = active
-    countEl.textContent  = `${count} memor${count === 1 ? 'y' : 'ies'}`
-    btnInject.disabled   = false
+    scopeEl.textContent    = active
+    countEl.textContent    = `${count} memor${count === 1 ? 'y' : 'ies'}`
+    btnInject.disabled     = false
     errorMsg.style.display = 'none'
-  } catch {
+  } else {
     dot.className          = 'dot offline'
     statusText.textContent = 'offline'
     scopeEl.textContent    = '—'
@@ -38,14 +40,12 @@ btnInject.addEventListener('click', async () => {
   btnInject.disabled    = true
 
   try {
-    // Fetch context via background (bypasses page CSP)
     const res = await new Promise(resolve =>
-      chrome.runtime.sendMessage({ action: 'getContext' }, resolve)
+      ext.runtime.sendMessage({ action: 'getContext' }, resolve)
     )
     if (res?.ok) {
-      // Send context to content script to do the DOM injection
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-      chrome.tabs.sendMessage(tab.id, { action: 'inject', context: res.text })
+      const [tab] = await ext.tabs.query({ active: true, currentWindow: true })
+      ext.tabs.sendMessage(tab.id, { action: 'inject', context: res.text })
     }
   } catch (err) {
     console.error('Inject failed:', err)
@@ -57,7 +57,7 @@ btnInject.addEventListener('click', async () => {
 })
 
 btnUi.addEventListener('click', () => {
-  chrome.tabs.create({ url: MEMORY_URL })
+  ext.tabs.create({ url: 'http://localhost:7711' })
 })
 
 init()

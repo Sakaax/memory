@@ -462,7 +462,9 @@ memory ui
 **Firefox:**
 1. Go to `about:debugging`
 2. Click **This Firefox** → **Load Temporary Add-on**
-3. Select `extension/manifest.json`
+3. Select `extension/manifest-firefox.json`
+
+> Firefox uses a separate manifest (`manifest-firefox.json`, MV2) because Firefox MV3 does not yet support `background.service_worker`.
 
 ### Usage
 
@@ -529,10 +531,12 @@ memory/
 │       └── static/
 │           └── index.html  local web interface
 └── extension/
-    ├── manifest.json       MV3 — Chrome, Brave, Arc, Firefox
-    ├── content.js          floating inject button on AI sites
-    ├── popup.html          toolbar popup
-    └── popup.js            popup logic
+    ├── manifest.json         MV3 — Chrome, Brave, Arc
+    ├── manifest-firefox.json MV2 — Firefox
+    ├── background.js         fetch proxy (bypasses page CSP)
+    ├── content.js            floating inject button + scope picker
+    ├── popup.html            toolbar popup
+    └── popup.js              popup logic
 ```
 
 **Runtime directory** (`~/.memory/` by default, override with `MEMORY_HOME`):
