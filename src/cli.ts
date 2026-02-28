@@ -437,6 +437,57 @@ async function cmdSetup(): Promise<void> {
   outro(`${c.dim}Reload shell: source ${rc}${c.reset}`)
 }
 
+async function cmdUninstall(): Promise<void> {
+  const { intro, outro, multiselect, spinner, note, isCancel } = await import("@clack/prompts")
+
+  intro(`${c.bold}  memory uninstall  ${c.reset}`)
+
+  // Detect which connectors are currently installed
+  const installed = SUPPORTED_CONNECTORS.filter((conn) =>
+    existsSync(join(LOCAL_BIN, `${conn.name}-memory`))
+  )
+
+  if (installed.length === 0) {
+    note("No connectors installed.", "Nothing to remove")
+    outro("Done.")
+    return
+  }
+
+  const selected = await multiselect({
+    message: "Select connectors to uninstall:",
+    options: installed.map((conn) => ({
+      value: conn.name,
+      label: `${c.bold}${conn.name}-memory${c.reset}`,
+      hint:  CONNECTOR_HINTS[conn.name] ?? conn.name,
+    })),
+    initialValues: [],
+  })
+
+  if (isCancel(selected) || (selected as string[]).length === 0) {
+    outro("Nothing removed.")
+    return
+  }
+
+  const selectedNames = selected as string[]
+
+  const s = spinner()
+  s.start("Removing connectors...")
+
+  const removed: string[] = []
+  for (const name of selectedNames) {
+    const wrapperPath = join(LOCAL_BIN, `${name}-memory`)
+    if (existsSync(wrapperPath)) {
+      unlinkSync(wrapperPath)
+      removed.push(`${name}-memory`)
+    }
+  }
+
+  s.stop("Done")
+
+  note(removed.map((n) => `  ${c.yellow}✕${c.reset} ${n} removed`).join("\n"), "Uninstalled")
+  outro(`Run ${c.green}memory setup${c.reset} to reinstall anytime.`)
+}
+
 // ─── router ──────────────────────────────────────────────────────────────────
 
 function cmdHelp(): void {
@@ -455,9 +506,10 @@ ${c.bold}COMMANDS${c.reset}
   ${c.green}forget${c.reset}   ${c.dim}<id>${c.reset}
       Delete a memory by id.
 
-  ${c.green}status${c.reset}   Show statistics.
-  ${c.green}dump${c.reset}     Export all memories as JSON.
-  ${c.green}setup${c.reset}    Configure AI CLI connectors interactively.
+  ${c.green}status${c.reset}     Show statistics.
+  ${c.green}dump${c.reset}       Export all memories as JSON.
+  ${c.green}setup${c.reset}      Configure AI CLI connectors interactively.
+  ${c.green}uninstall${c.reset}  Remove connectors interactively.
 
 ${c.bold}TYPES${c.reset}
   ${c.dim}${VALID_TYPES.join(" · ")}${c.reset}
@@ -481,6 +533,7 @@ switch (command) {
   case "forget":    cmdForget(rest);                      break
   case "context":   cmdContext();                         break
   case "setup":     cmdSetup().catch(console.error);      break
+  case "uninstall": cmdUninstall().catch(console.error);  break
   case "help":
   default:          cmdHelp()
 }
