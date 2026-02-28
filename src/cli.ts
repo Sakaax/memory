@@ -332,14 +332,18 @@ fi
   }
 
   if (mode === "ollama") {
-    // ollama has no --system CLI flag; inject context as initial positional prompt
-    // model name is configurable via OLLAMA_MODEL env var
+    // ollama has no --system CLI flag; inject context via stdin pipe
+    // auto-detect first installed model if OLLAMA_MODEL not set
     return header + `
-MODEL=\${OLLAMA_MODEL:-llama3.2}
+MODEL=\${OLLAMA_MODEL:-$(ollama list 2>/dev/null | awk 'NR==2{print $1}')}
+if [ -z "$MODEL" ]; then
+  printf '[memory] ollama: no model found. Set OLLAMA_MODEL=<model> or run: ollama pull llama3.2\\n' >&2
+  exit 1
+fi
 if [ -z "$CONTEXT" ]; then
   exec "${binPath}" run "$MODEL" "$@"
 elif [ "$#" -gt 0 ]; then
-  exec "${binPath}" run "$MODEL" "Context: $CONTEXT\\n\\nTask: $*"
+  printf 'Context:\\n%s\\n\\nTask: %s\\n' "$CONTEXT" "$*" | "${binPath}" run "$MODEL"
 else
   exec "${binPath}" run "$MODEL"
 fi
@@ -381,15 +385,16 @@ fi
     nonInteractiveCmd = `printf '%s\\n' "$CONTEXT" | "${binPath}" "$*"`
 
   } else if (mode === "cursor-agent") {
-    // cursor-agent: no system-prompt flag; -p is headless mode
-    // interactive mode starts without context injection
-    interactiveCmd    = `exec "${binPath}"`
+    // cursor-agent accepts a positional prompt → inject context as initial prompt
+    // -p is headless (print) mode
+    interactiveCmd    = `exec "${binPath}" "$CONTEXT"`
     nonInteractiveCmd = `exec "${binPath}" -p "Context: $CONTEXT — $*"`
 
   } else if (mode === "droid") {
-    // droid uses exec subcommand for task execution
-    interactiveCmd    = `exec "${binPath}" exec "$CONTEXT"`
-    nonInteractiveCmd = `exec "${binPath}" exec "$CONTEXT — $*"`
+    // droid accepts prompt positionally for interactive sessions
+    // droid exec subcommand + stdin for non-interactive tasks
+    interactiveCmd    = `exec "${binPath}" "$CONTEXT"`
+    nonInteractiveCmd = `printf 'Context:\\n%s\\n\\nTask: %s\\n' "$CONTEXT" "$*" | "${binPath}" exec -`
 
   } else if (mode === "positional") {
     interactiveCmd    = `exec "${binPath}" "$CONTEXT"`
