@@ -1,0 +1,16 @@
+{
+  "name": "memory",
+  "version": "0.1.0",
+  "description": "Persistent cognitive layer for cross-AI context",
+  "bin": {
+    "memory": "./src/cli.ts"
+  },
+  "scripts": {
+    "cli": "bun run src/cli.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "bun-types": "latest"
+  }
+}

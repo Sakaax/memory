@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+MEMORY_DIR="/home/sakaax/Dev/memory"
+CONTEXT=$("$MEMORY_DIR/memory" context 2>/dev/null)
+
+if [ -z "$CONTEXT" ]; then
+  exec "/home/sakaax/.bun/bin/gemini" "$@"
+elif [ "$#" -gt 0 ]; then
+  printf '%s\n\nUser query: %s\n' "$CONTEXT" "$*" | "/home/sakaax/.bun/bin/gemini" -p "$*"
+else
+  exec "/home/sakaax/.bun/bin/gemini" "-i" "$CONTEXT"
+fi
