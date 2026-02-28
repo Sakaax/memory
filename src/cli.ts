@@ -260,11 +260,13 @@ function cmdContext(): void {
 
 // ─── setup ───────────────────────────────────────────────────────────────────
 
-// flags: interactive flag to inject context ("-i", "--context", etc.)
-// flags = "" → fallback to stdin injection (works with most CLIs)
-const SUPPORTED_CONNECTORS: Array<{ name: string; bin: string; flags: string }> = [
-  { name: "gemini", bin: join(BUN_BIN, "gemini"), flags: "-i" },
-  { name: "codex",  bin: join(BUN_BIN, "codex"),  flags: ""   },
+// mode: how to inject memory context into the CLI
+//   flag      → CLI accepts an interactive-start flag: `cli <flag> "<context>"`
+//   positional → CLI accepts context as first positional arg: `cli "<context>"`
+//   stdin      → pipe context via stdin
+const SUPPORTED_CONNECTORS: Array<{ name: string; bin: string; mode: "flag" | "positional" | "stdin"; flag?: string }> = [
+  { name: "gemini", bin: join(BUN_BIN, "gemini"), mode: "flag",       flag: "-i" },
+  { name: "codex",  bin: join(BUN_BIN, "codex"),  mode: "positional"             },
 ]
 
 function isAvailable(bin: string): boolean {
@@ -287,10 +289,15 @@ function ensureInPath(rc: string, dir: string, label: string): boolean {
   return true
 }
 
-function makeWrapper(binPath: string, interactiveFlag: string): string {
-  const interactiveCmd = interactiveFlag
-    ? `exec "${binPath}" "${interactiveFlag}" "$CONTEXT"`
-    : `printf '%s\\n\\n' "$CONTEXT" | exec "${binPath}"`
+function makeWrapper(binPath: string, mode: string, flag?: string): string {
+  let interactiveCmd: string
+  if (mode === "flag" && flag) {
+    interactiveCmd = `exec "${binPath}" "${flag}" "$CONTEXT"`
+  } else if (mode === "positional") {
+    interactiveCmd = `exec "${binPath}" "$CONTEXT"`
+  } else {
+    interactiveCmd = `printf '%s\\n\\n' "$CONTEXT" | exec "${binPath}"`
+  }
 
   return `#!/usr/bin/env bash
 MEMORY_DIR="${INSTALL_DIR}"
@@ -348,7 +355,7 @@ function cmdSetup(): void {
             : connector.bin
 
       const wrapperPath = join(LOCAL_BIN, `${connector.name}-memory`)
-      writeFileSync(wrapperPath, makeWrapper(binPath, connector.flags), { mode: 0o755 })
+      writeFileSync(wrapperPath, makeWrapper(binPath, connector.mode, connector.flag), { mode: 0o755 })
       console.log(`✓ ${connector.name}-memory wrapper installed`)
       installed.push(connector.name)
     } else {
