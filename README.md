@@ -20,14 +20,18 @@ You keep re-explaining yourself.
 ## How it works
 
 ```
-memory remember "I use Bun, never npm"
+memory remember "I use Bun, never npm"   ← you, or any AI, writes
         ↓
-   ~/.memory/global/memory.json   ← single source of truth
+   ~/.memory/global/memory.json          ← single source of truth
    ↙    ↓    ↘
-Claude  Gemini  Codex             ← all read the same context
+Claude  Gemini  Codex                    ← all read the same context
+   ↘    ↓    ↙
+memory remember "..."                    ← AIs write back automatically
 ```
 
 Context is injected at session start. No API calls. No cloud. No setup beyond the CLI.
+
+AIs with shell access can also write back to memory autonomously during a session.
 
 ---
 
@@ -206,6 +210,46 @@ Hooks are:
 - **non-blocking** — memory operation completes before the hook runs
 - **fail-safe** — if a hook crashes, only a log message is emitted
 
+### AI Write-Back
+
+AIs can write to memory autonomously — no MCP, no API, no extra setup.
+
+Every injected context tells the AI how to store memories, re-read context mid-session, and which type to use:
+
+**Tested with Codex:**
+
+```
+Ran memory remember "I want to build mobile apps with Expo Go"
+         --type preference --domain development
+→ Stored: [fbf9a100] "I want to build mobile apps with Expo Go" (preference/development)
+```
+
+**Tested with Droid** — same result.
+
+Any AI with shell access runs the command directly. Others output it for the user to run.
+
+**Type guide:**
+
+| Type | When to use |
+|---|---|
+| `preference` | How the user likes to work, tools, style, communication |
+| `knowledge` | Facts, domain knowledge, concepts, tech details |
+| `project` | Current/past projects, status, stack, goals |
+| `decision` | Architectural, technical, or strategic choices made |
+| `skill` | Abilities, expertise level, certifications |
+| `relationship` | People, teams, collaborators, contacts |
+| `goal` | Objectives, targets, things they want to achieve |
+| `constraint` | Hard limits, non-negotiables, restrictions |
+
+**Re-read mid-session** — AIs can refresh their context at any point:
+
+```bash
+memory context           # full context (all memories, grouped by domain)
+memory recall <query>    # search by keyword, type, or domain
+```
+
+---
+
 ### Connectors
 
 ```bash
@@ -296,7 +340,7 @@ Each connector is a shell wrapper in `~/.local/bin` that injects your memory con
 | ShellGPT | `sgpt-memory` | context via stdin, query as positional arg |
 | Goose | `goose-memory` | `goose run --system` — `-s` interactive / `-t` task |
 | Groq | `groq-memory` | `--system` flag — interactive only |
-| Ollama | `ollama-memory` | positional prompt — model via `OLLAMA_MODEL` env |
+| Ollama | `ollama-memory` | Modelfile `SYSTEM` directive (interactive) / stdin pipe (task) |
 | Cursor Agent | `cursor-agent-memory` | `-p` headless — no interactive injection |
 | Droid | `droid-memory` | `droid exec` subcommand |
 
@@ -395,14 +439,19 @@ memory/
 
 **Next**
 - [ ] `memory harvest` — extract memories from a session transcript
-- [ ] In-session write — wrappers detect `!remember <content>` and store directly
-- [ ] More connectors — Copilot CLI, aichat, sgpt
+- [ ] `memoryd` — background daemon with HTTP API
 
 **Later**
-- [ ] `memoryd` — background daemon with HTTP API
 - [ ] Confidence decay — memories fade without reinforcement
 - [ ] Web SDK — JS library for browser integration
 - [ ] Device sync — opt-in, encrypted
+
+**Done**
+- [x] AI write-back — AIs store memories autonomously via injected context
+- [x] Scopes — independent memory contexts per project
+- [x] Hooks — local scripts triggered on memory events
+- [x] Watch — live memory change stream
+- [x] 11 connectors — Claude, Gemini, Codex, OpenCode, Aider, ShellGPT, Goose, Groq, Ollama, Cursor Agent, Droid
 
 ---
 
