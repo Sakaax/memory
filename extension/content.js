@@ -68,15 +68,14 @@ function closePicker() {
 async function openPicker(btnRect) {
   if (pickerOpen) { closePicker(); return }
 
-  let scopes
-  try {
-    const r = await fetch(`${MEMORY_URL}/api/scopes`, { signal: AbortSignal.timeout(2000) })
-    const data = await r.json()
-    scopes = data.scopes   // [{ name, count }]
-  } catch {
+  const res = await new Promise(resolve =>
+    chrome.runtime.sendMessage({ action: 'getScopes' }, resolve)
+  )
+  if (!res?.ok) {
     showToast('Cannot reach memory server — run: memory ui', true)
     return
   }
+  const scopes = res.data.scopes  // [{ name, count }]
 
   pickerOpen = true
   const picker = document.createElement('div')
@@ -154,16 +153,14 @@ async function doInject(scope) {
   const textarea = getTextarea()
   if (!textarea) { showToast('No input field found on this page.', true); return }
 
-  let context
-  try {
-    const url = scope ? `${MEMORY_URL}/api/context?scope=${encodeURIComponent(scope)}` : `${MEMORY_URL}/api/context`
-    const r   = await fetch(url, { signal: AbortSignal.timeout(3000) })
-    if (!r.ok) throw new Error()
-    context = await r.text()
-  } catch {
+  const res = await new Promise(resolve =>
+    chrome.runtime.sendMessage({ action: 'getContext', scope }, resolve)
+  )
+  if (!res?.ok) {
     showToast('Cannot reach memory server — run: memory ui', true)
     return
   }
+  const context = res.text
 
   injectText(textarea, context)
   showToast(`${scope} context injected ✓`)
@@ -173,12 +170,9 @@ async function doInject(scope) {
 async function checkServer() {
   const dot = document.getElementById('memory-dot')
   if (!dot) return
-  try {
-    const r = await fetch(`${MEMORY_URL}/api/scopes`, { signal: AbortSignal.timeout(1500) })
-    dot.style.background = r.ok ? '#4ade80' : '#f87171'
-  } catch {
-    dot.style.background = '#f87171'
-  }
+  chrome.runtime.sendMessage({ action: 'getScopes' }, res => {
+    dot.style.background = res?.ok ? '#4ade80' : '#f87171'
+  })
 }
 
 // ── Button ────────────────────────────────────────────────────────────────────
@@ -229,6 +223,19 @@ function createButton() {
 
   return btn
 }
+
+// ── Listen for inject from popup ─────────────────────────────────────────────
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg.action === 'inject' && msg.context) {
+    const textarea = getTextarea()
+    if (textarea) {
+      injectText(textarea, msg.context)
+      showToast('Memory context injected ✓')
+    } else {
+      showToast('No input field found on this page.', true)
+    }
+  }
+})
 
 // ── Mount ─────────────────────────────────────────────────────────────────────
 function mount() {
