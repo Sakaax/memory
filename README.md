@@ -291,16 +291,32 @@ Each connector is a shell wrapper in `~/.local/bin` that injects your memory con
 | Claude Code | `claude-memory` | `--append-system-prompt` |
 | Gemini CLI | `gemini-memory` | `-i` (interactive context) |
 | Codex CLI | `codex-memory` | positional argument |
+| OpenCode | `opencode-memory` | `--prompt` (TUI pre-fill) / `run` headless |
+| Aider | `aider-memory` | `--read <tmpfile>` (temp file, auto-cleaned) |
+| ShellGPT | `sgpt-memory` | context via stdin, query as positional arg |
+| Goose | `goose-memory` | `goose run --system` — `-s` interactive / `-t` task |
+| Groq | `groq-memory` | `--system` flag — interactive only |
+| Ollama | `ollama-memory` | positional prompt — model via `OLLAMA_MODEL` env |
+| Cursor Agent | `cursor-agent-memory` | `-p` headless — no interactive injection |
+| Droid | `droid-memory` | `droid exec` subcommand |
 
 **Usage:**
 
 ```bash
 gemini-memory                           # interactive session with memory
 claude-memory                           # interactive session with memory
-codex-memory                            # interactive session with memory
+aider-memory src/main.ts                # aider with memory context injected
+goose-memory                            # interactive goose session with context
+ollama-memory "explain this code"       # one-shot with context
 
-gemini-memory "what runtime do I use?"  # one-shot query
+OLLAMA_MODEL=mistral ollama-memory      # use a specific local model
 ```
+
+**Notes:**
+- `aider-memory` writes context to a temp file (`/tmp/memory-XXXXXX.md`) and cleans it up on exit
+- `ollama-memory` defaults to `llama3.2` — override with `OLLAMA_MODEL=<model>`
+- `cursor-agent-memory` injects context only in headless mode (`-p`)
+- `groq-memory` is always interactive — positional args are ignored
 
 ---
 
