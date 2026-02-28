@@ -8,16 +8,18 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:       #0a0a0a;
-      --surface:  #111111;
-      --surface2: #1a1a1a;
-      --border:   #222222;
-      --border2:  #2e2e2e;
-      --text:     #eeeeee;
-      --dim:      #555555;
-      --dim2:     #888888;
-      --accent:   #4ade80;
-      --danger:   #f87171;
+      --bg:             #08080f;
+      --surface:        #0e0e1a;
+      --surface2:       #151524;
+      --border:         #1c1c32;
+      --border2:        #2a2a48;
+      --text:           #e8e8f0;
+      --dim:            #44445a;
+      --dim2:           #7878a0;
+      --accent:         #4ade80;
+      --danger:         #f87171;
+      --danger-bg:      rgba(248,113,113,0.08);
+      --danger-border:  rgba(248,113,113,0.25);
     }
 
     body {
@@ -28,51 +30,138 @@
       min-height: 100vh;
     }
 
-    /* ── Header ────────────────────────────────────── */
+    /* ── Header ─────────────────────────────────────────── */
     header {
       position: sticky;
       top: 0;
-      z-index: 10;
+      z-index: 20;
       display: flex;
       align-items: center;
-      gap: 16px;
-      padding: 12px 24px;
-      background: var(--surface);
+      gap: 0;
+      height: 52px;
+      background: rgba(8,8,15,0.92);
+      backdrop-filter: blur(14px);
       border-bottom: 1px solid var(--border);
+      padding: 0 20px;
     }
 
     .logo {
       font-family: monospace;
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 700;
-      letter-spacing: -0.5px;
+      letter-spacing: -0.3px;
       color: var(--accent);
       white-space: nowrap;
+      padding-right: 16px;
     }
 
-    .search-wrap { flex: 1; }
+    .vsep {
+      width: 1px;
+      height: 18px;
+      background: var(--border);
+      flex-shrink: 0;
+      margin-right: 12px;
+    }
+
+    /* ── Scope tabs ──────────────────────────────────────── */
+    .scope-tabs {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+
+    .scope-tab {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 11px;
+      border-radius: 7px;
+      font-size: 12px;
+      font-family: monospace;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      color: var(--dim2);
+      transition: all 0.15s;
+      white-space: nowrap;
+      user-select: none;
+    }
+    .scope-tab:hover {
+      color: var(--text);
+      background: var(--surface);
+      border-color: var(--border);
+    }
+    .scope-tab.active {
+      background: color-mix(in srgb, var(--accent) 9%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+      color: var(--accent);
+    }
+
+    .scope-count {
+      font-size: 10px;
+      font-family: monospace;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 5px;
+      color: var(--dim2);
+      line-height: 1.5;
+      transition: all 0.15s;
+    }
+    .scope-tab.active .scope-count {
+      background: color-mix(in srgb, var(--accent) 8%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 22%, transparent);
+      color: color-mix(in srgb, var(--accent) 65%, transparent);
+    }
+
+    .scope-del {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      font-size: 10px;
+      color: var(--dim);
+      opacity: 0;
+      transition: opacity 0.15s, color 0.15s, background 0.15s;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+    .scope-tab:hover .scope-del { opacity: 1; }
+    .scope-del:hover { color: var(--danger); background: var(--danger-bg); }
+
+    /* ── Search / meta ───────────────────────────────────── */
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      justify-content: flex-end;
+    }
 
     #search {
-      width: 100%;
-      max-width: 440px;
-      padding: 7px 12px;
-      background: var(--surface2);
+      width: 220px;
+      padding: 6px 11px;
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 8px;
       color: var(--text);
       font-size: 13px;
       outline: none;
-      transition: border-color 0.15s;
+      transition: border-color 0.15s, width 0.2s;
     }
     #search::placeholder { color: var(--dim); }
-    #search:focus { border-color: var(--border2); }
+    #search:focus { border-color: var(--border2); width: 280px; }
 
     .meta {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       color: var(--dim2);
-      font-size: 12px;
+      font-size: 11px;
+      font-family: monospace;
       white-space: nowrap;
     }
 
@@ -84,83 +173,45 @@
       font-size: 14px;
       padding: 5px 10px;
       border-radius: 7px;
-      transition: color 0.15s, border-color 0.15s;
-    }
-    .icon-btn:hover { color: var(--text); border-color: var(--border2); }
-
-    /* ── Scope tabs ─────────────────────────────────── */
-    .scope-tabs {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      flex-shrink: 0;
-    }
-
-    .scope-tab {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      padding: 4px 11px;
-      border-radius: 6px;
-      font-size: 11px;
-      font-family: monospace;
-      font-weight: 600;
-      cursor: pointer;
-      border: 1px solid var(--border);
-      background: none;
-      color: var(--dim2);
       transition: all 0.15s;
-      white-space: nowrap;
-      user-select: none;
     }
-    .scope-tab:hover { color: var(--text); border-color: var(--border2); }
-    .scope-tab.active {
-      background: color-mix(in srgb, var(--accent) 12%, transparent);
-      border-color: color-mix(in srgb, var(--accent) 35%, transparent);
-      color: var(--accent);
-    }
+    .icon-btn:hover { color: var(--text); border-color: var(--border2); background: var(--surface); }
 
-    .scope-del {
-      font-size: 12px;
-      line-height: 1;
-      color: var(--dim);
-      opacity: 0;
-      transition: opacity 0.15s, color 0.15s;
-      padding: 0 1px;
-    }
-    .scope-tab:hover .scope-del { opacity: 1; }
-    .scope-del:hover { color: var(--danger); }
-
-    /* ── Grid ──────────────────────────────────────── */
+    /* ── Grid ────────────────────────────────────────────── */
     main {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 14px;
-      padding: 20px 24px;
+      grid-template-columns: repeat(auto-fill, minmax(296px, 1fr));
+      gap: 12px;
+      padding: 20px 20px;
     }
 
     .empty {
       grid-column: 1 / -1;
-      text-align: center;
-      padding: 80px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 90px 24px;
+      gap: 10px;
       color: var(--dim);
       font-size: 13px;
     }
+    .empty-icon { font-size: 28px; opacity: 0.25; }
 
-    /* ── Card ──────────────────────────────────────── */
+    /* ── Card ────────────────────────────────────────────── */
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 14px 16px;
-      cursor: pointer;
+      padding: 13px 15px 11px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      transition: border-color 0.15s, transform 0.1s;
+      gap: 9px;
+      transition: border-color 0.15s, box-shadow 0.2s;
     }
-    .card:hover { border-color: var(--border2); }
-    .card:active { transform: scale(0.995); }
+    .card:hover {
+      border-color: var(--border2);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+    }
 
     .card-head {
       display: flex;
@@ -178,9 +229,9 @@
     }
 
     .type-badge {
-      background: color-mix(in srgb, var(--color) 18%, transparent);
+      background: color-mix(in srgb, var(--color) 14%, transparent);
       color: var(--color);
-      border: 1px solid color-mix(in srgb, var(--color) 30%, transparent);
+      border: 1px solid color-mix(in srgb, var(--color) 26%, transparent);
     }
 
     .domain-badge {
@@ -188,82 +239,134 @@
       color: var(--dim2);
       border: 1px solid var(--border);
       font-family: monospace;
-      font-size: 11px;
+      font-size: 10px;
     }
 
-    .del-btn {
+    .card-menu-btn {
       margin-left: auto;
       background: none;
       border: none;
-      color: var(--dim);
+      color: var(--dim2);
       cursor: pointer;
-      font-size: 12px;
-      padding: 3px 7px;
+      font-size: 15px;
+      width: 26px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       border-radius: 5px;
-      opacity: 0;
-      transition: opacity 0.15s, color 0.15s, background 0.15s;
+      opacity: 0.35;
+      transition: opacity 0.15s, background 0.15s, color 0.15s;
+      letter-spacing: 1.5px;
+      line-height: 1;
+      flex-shrink: 0;
     }
-    .card:hover .del-btn { opacity: 1; }
-    .del-btn:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+    .card:hover .card-menu-btn { opacity: 0.8; }
+    .card-menu-btn:hover,
+    .card-menu-btn.active { opacity: 1; background: var(--surface2); color: var(--text); }
 
     .card-content {
-      font-size: 13.5px;
-      line-height: 1.55;
+      font-size: 13px;
+      line-height: 1.6;
       color: var(--text);
       word-break: break-word;
+      cursor: pointer;
     }
+    .card-content:hover { color: #fff; }
 
     .card-foot {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
+      padding-top: 1px;
     }
 
-    .conf-wrap {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-    }
+    .conf-wrap { display: flex; align-items: center; gap: 7px; }
 
     .conf-track {
-      width: 56px;
-      height: 3px;
-      background: var(--border);
+      width: 48px;
+      height: 2px;
+      background: var(--border2);
       border-radius: 2px;
       overflow: hidden;
     }
-
     .conf-fill {
       height: 100%;
       background: var(--accent);
       border-radius: 2px;
+      opacity: 0.7;
     }
 
     .conf-label {
-      font-size: 11px;
+      font-size: 10px;
       font-family: monospace;
       color: var(--dim2);
     }
 
     .date {
-      font-size: 11px;
+      font-size: 10px;
       color: var(--dim);
+      font-family: monospace;
     }
 
-    /* ── Modal ─────────────────────────────────────── */
+    /* ── Dropdown ────────────────────────────────────────── */
+    .dropdown {
+      position: fixed;
+      z-index: 300;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 10px;
+      padding: 4px;
+      min-width: 164px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.3);
+      display: none;
+    }
+    .dropdown.open { display: block; animation: pop 0.12s cubic-bezier(.2,.8,.4,1); }
+    @keyframes pop {
+      from { opacity: 0; transform: scale(0.93) translateY(-6px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .dd-item {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 8px 11px;
+      border: none;
+      background: none;
+      color: var(--dim2);
+      font-size: 13px;
+      font-family: inherit;
+      cursor: pointer;
+      border-radius: 7px;
+      transition: background 0.1s, color 0.1s;
+      text-align: left;
+    }
+    .dd-item:hover { background: var(--border); color: var(--text); }
+    .dd-item.dd-danger { color: color-mix(in srgb, var(--danger) 85%, transparent); }
+    .dd-item.dd-danger:hover { background: var(--danger-bg); color: var(--danger); }
+
+    .dd-icon { font-size: 12px; width: 15px; text-align: center; opacity: 0.6; flex-shrink: 0; }
+
+    .dd-sep { height: 1px; background: var(--border); margin: 3px 0; }
+
+    /* ── Overlay ─────────────────────────────────────────── */
     .overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.65);
+      background: rgba(0,0,0,0.72);
       display: flex;
       align-items: center;
       justify-content: center;
       z-index: 100;
-      backdrop-filter: blur(3px);
+      backdrop-filter: blur(8px);
       padding: 16px;
+      animation: fade-in 0.15s ease;
     }
     .overlay.hidden { display: none; }
+    @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 
     .modal {
       background: var(--surface);
@@ -275,6 +378,11 @@
       display: flex;
       flex-direction: column;
       gap: 16px;
+      animation: slide-up 0.15s cubic-bezier(.2,.8,.4,1);
+    }
+    @keyframes slide-up {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
 
     .modal-head {
@@ -283,11 +391,7 @@
       justify-content: space-between;
     }
 
-    .modal-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text);
-    }
+    .modal-title { font-size: 14px; font-weight: 600; color: var(--text); }
 
     .close-btn {
       background: none;
@@ -298,20 +402,18 @@
       line-height: 1;
       padding: 2px 6px;
       border-radius: 5px;
+      transition: color 0.15s;
     }
     .close-btn:hover { color: var(--text); }
 
-    .field {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
+    .field { display: flex; flex-direction: column; gap: 6px; }
 
     .field-label {
-      font-size: 11px;
+      font-size: 10px;
       text-transform: uppercase;
-      letter-spacing: 0.6px;
+      letter-spacing: 0.7px;
       color: var(--dim2);
+      font-weight: 700;
     }
 
     textarea, input[type="text"], select {
@@ -320,39 +422,28 @@
       border-radius: 8px;
       color: var(--text);
       font-size: 13px;
-      padding: 8px 11px;
+      padding: 9px 11px;
       outline: none;
       font-family: inherit;
       transition: border-color 0.15s;
       width: 100%;
     }
     textarea:focus, input[type="text"]:focus, select:focus { border-color: var(--border2); }
-    textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
+    textarea { resize: vertical; min-height: 80px; line-height: 1.55; }
     select { cursor: pointer; }
 
     .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
-    .slider-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
+    .slider-row { display: flex; align-items: center; gap: 12px; }
 
     input[type="range"] {
-      flex: 1;
-      padding: 0;
-      background: none;
-      border: none;
-      accent-color: var(--accent);
-      cursor: pointer;
+      flex: 1; padding: 0; background: none; border: none;
+      accent-color: var(--accent); cursor: pointer;
     }
 
     .slider-val {
-      font-family: monospace;
-      font-size: 12px;
-      color: var(--text);
-      width: 30px;
-      text-align: right;
+      font-family: monospace; font-size: 12px; color: var(--text);
+      width: 30px; text-align: right;
     }
 
     .modal-actions {
@@ -367,42 +458,80 @@
       font-size: 13px;
       font-family: inherit;
       border-radius: 8px;
-      padding: 7px 16px;
+      padding: 8px 18px;
       border: 1px solid var(--border);
       transition: background 0.15s, opacity 0.15s;
       font-weight: 500;
     }
-
-    .btn-ghost {
-      background: var(--surface2);
-      color: var(--dim2);
-    }
+    .btn-ghost { background: var(--surface2); color: var(--dim2); }
     .btn-ghost:hover { background: var(--border); color: var(--text); }
-
-    .btn-primary {
-      background: var(--accent);
-      color: #000;
-      border-color: var(--accent);
-      font-weight: 600;
-    }
+    .btn-primary { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
     .btn-primary:hover { opacity: 0.88; }
+    .btn-danger { background: var(--danger); color: #fff; border-color: var(--danger); font-weight: 600; }
+    .btn-danger:hover { opacity: 0.88; }
+
+    /* ── Confirm modal ───────────────────────────────────── */
+    .confirm-modal {
+      max-width: 360px;
+      text-align: center;
+      gap: 14px;
+    }
+
+    .confirm-icon { font-size: 32px; line-height: 1; }
+
+    .confirm-title { font-size: 17px; font-weight: 700; color: var(--text); }
+
+    .confirm-desc {
+      font-size: 13px;
+      color: var(--dim2);
+      line-height: 1.55;
+    }
+    .confirm-desc strong { color: var(--text); font-family: monospace; }
+    .confirm-desc em { font-style: normal; }
+
+    .confirm-warn {
+      background: var(--danger-bg);
+      border: 1px solid var(--danger-border);
+      border-radius: 8px;
+      padding: 9px 13px;
+      font-size: 12px;
+      color: var(--danger);
+      text-align: left;
+    }
+
+    .confirm-modal .modal-actions { justify-content: center; gap: 10px; padding-top: 2px; }
   </style>
 </head>
 <body>
 
   <header>
     <div class="logo">memory</div>
+    <div class="vsep"></div>
     <div class="scope-tabs" id="scope-tabs"></div>
-    <div class="search-wrap">
-      <input type="search" id="search" placeholder="Search memories…" autocomplete="off" />
-    </div>
-    <div class="meta">
-      <span id="count">—</span>
-      <button class="icon-btn" id="refresh" title="Refresh">↻</button>
+    <div class="header-right">
+      <input type="search" id="search" placeholder="Search…" autocomplete="off" />
+      <div class="meta">
+        <span id="count">—</span>
+        <button class="icon-btn" id="refresh" title="Refresh">↻</button>
+      </div>
     </div>
   </header>
 
   <main id="grid"></main>
+
+  <!-- Card dropdown -->
+  <div class="dropdown" id="dropdown">
+    <button class="dd-item" id="dd-edit">
+      <span class="dd-icon">✎</span> Edit
+    </button>
+    <button class="dd-item" id="dd-move">
+      <span class="dd-icon">⤷</span> Move to scope
+    </button>
+    <div class="dd-sep"></div>
+    <button class="dd-item dd-danger" id="dd-delete">
+      <span class="dd-icon">✕</span> Delete
+    </button>
+  </div>
 
   <!-- Edit modal -->
   <div class="overlay hidden" id="overlay">
@@ -411,12 +540,10 @@
         <span class="modal-title">Edit memory</span>
         <button class="close-btn" id="close-modal">✕</button>
       </div>
-
       <div class="field">
         <span class="field-label">Content</span>
         <textarea id="edit-content" rows="3"></textarea>
       </div>
-
       <div class="row-2">
         <div class="field">
           <span class="field-label">Type</span>
@@ -427,7 +554,6 @@
           <input type="text" id="edit-domain" />
         </div>
       </div>
-
       <div class="field">
         <span class="field-label">Importance</span>
         <div class="slider-row">
@@ -435,17 +561,29 @@
           <span class="slider-val" id="importance-val">0.5</span>
         </div>
       </div>
-
       <div class="field" id="move-field" style="display:none">
         <span class="field-label">Move to scope</span>
         <select id="edit-move-scope">
           <option value="">— keep in current scope —</option>
         </select>
       </div>
-
       <div class="modal-actions">
         <button class="btn btn-ghost" id="btn-cancel">Cancel</button>
         <button class="btn btn-primary" id="btn-save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm modal -->
+  <div class="overlay hidden" id="confirm-overlay">
+    <div class="modal confirm-modal" role="alertdialog">
+      <div class="confirm-icon" id="confirm-icon">⚠️</div>
+      <div class="confirm-title" id="confirm-title"></div>
+      <div class="confirm-desc" id="confirm-desc"></div>
+      <div id="confirm-warn-wrap"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="confirm-cancel">Cancel</button>
+        <button class="btn btn-danger" id="confirm-ok">Delete</button>
       </div>
     </div>
   </div>
@@ -464,41 +602,73 @@
       constraint:   '#f87171',
     }
 
-    // ── Populate type select ────────────────────────
+    // Populate type select
     const typeSelect = document.getElementById('edit-type')
     TYPES.forEach(t => {
       const opt = document.createElement('option')
-      opt.value = t
-      opt.textContent = t
+      opt.value = t; opt.textContent = t
       typeSelect.appendChild(opt)
     })
 
-    // ── State ───────────────────────────────────────
-    let editingId = null
+    // ── State ─────────────────────────────────────────────
+    let editingId    = null
+    let dropTargetId = null
 
-    // ── Scopes ──────────────────────────────────────
+    // ── Custom confirm ────────────────────────────────────
+    let confirmResolve = null
+
+    function showConfirm({ icon = '⚠️', title, desc, warn = null, label = 'Delete' }) {
+      document.getElementById('confirm-icon').textContent  = icon
+      document.getElementById('confirm-title').textContent = title
+      document.getElementById('confirm-desc').innerHTML    = desc
+      document.getElementById('confirm-ok').textContent    = label
+      document.getElementById('confirm-warn-wrap').innerHTML = warn
+        ? `<div class="confirm-warn">⚠ ${warn}</div>`
+        : ''
+      document.getElementById('confirm-overlay').classList.remove('hidden')
+      document.getElementById('confirm-cancel').focus()
+      return new Promise(resolve => { confirmResolve = resolve })
+    }
+
+    function closeConfirm(result) {
+      document.getElementById('confirm-overlay').classList.add('hidden')
+      if (confirmResolve) { confirmResolve(result); confirmResolve = null }
+    }
+
+    document.getElementById('confirm-cancel').addEventListener('click', () => closeConfirm(false))
+    document.getElementById('confirm-ok').addEventListener('click',     () => closeConfirm(true))
+    document.getElementById('confirm-overlay').addEventListener('click', e => {
+      if (e.target === e.currentTarget) closeConfirm(false)
+    })
+
+    // ── Scopes ────────────────────────────────────────────
+    let cachedScopes = []
+
     async function loadScopes() {
       const { scopes, active } = await fetch('/api/scopes').then(r => r.json())
+      cachedScopes = scopes
       const tabs = document.getElementById('scope-tabs')
-      tabs.innerHTML = scopes.map(s => {
-        const isActive  = s === active
-        const canDelete = s !== 'global' && !isActive
+      tabs.innerHTML = scopes.map(({ name, count }) => {
+        const isActive  = name === active
+        const canDelete = name !== 'global' && !isActive
         const delBtn    = canDelete
-          ? `<span class="scope-del" data-scope="${esc(s)}" title="Delete scope">×</span>`
+          ? `<span class="scope-del" data-scope="${esc(name)}" title="Delete scope">✕</span>`
           : ''
-        return `<div class="scope-tab ${isActive ? 'active' : ''}" data-scope="${esc(s)}">${esc(s)}${delBtn}</div>`
+        return `<div class="scope-tab${isActive ? ' active' : ''}" data-scope="${esc(name)}">
+          ${esc(name)}<span class="scope-count">${count}</span>${delBtn}
+        </div>`
       }).join('')
 
       tabs.querySelectorAll('.scope-tab').forEach(tab => {
-        tab.addEventListener('click', (e) => {
+        tab.addEventListener('click', e => {
           if (e.target.classList.contains('scope-del')) return
           switchScope(tab.dataset.scope)
         })
       })
       tabs.querySelectorAll('.scope-del').forEach(btn => {
-        btn.addEventListener('click', (e) => {
+        btn.addEventListener('click', e => {
           e.stopPropagation()
-          deleteScope(btn.dataset.scope)
+          deleteScopeWithConfirm(btn.dataset.scope)
         })
       })
     }
@@ -510,22 +680,33 @@
         body: JSON.stringify({ scope }),
       })
       await loadScopes()
-      await load(document.getElementById('search').value)
+      load(document.getElementById('search').value)
     }
 
-    async function deleteScope(scope) {
-      if (!confirm(`Delete scope "${scope}" and all its memories?\nThis cannot be undone.`)) return
+    async function deleteScopeWithConfirm(scope) {
+      const entry = cachedScopes.find(s => s.name === scope)
+      const count = entry?.count ?? 0
+      const confirmed = await showConfirm({
+        icon:  '🗑',
+        title: `Delete "${scope}"?`,
+        desc:  count > 0
+          ? `This will permanently remove <strong>${count} memor${count === 1 ? 'y' : 'ies'}</strong> from this scope.`
+          : 'This scope is empty.',
+        warn:  'This action cannot be undone.',
+        label: 'Delete scope',
+      })
+      if (!confirmed) return
       const res = await fetch(`/api/scopes/${encodeURIComponent(scope)}`, { method: 'DELETE' })
       if (!res.ok) {
         const { error } = await res.json()
-        alert(error)
+        await showConfirm({ icon: '✕', title: 'Error', desc: esc(error), label: 'OK' })
         return
       }
       await loadScopes()
       load(document.getElementById('search').value)
     }
 
-    // ── Load & render ───────────────────────────────
+    // ── Load & render ─────────────────────────────────────
     async function load(q = '') {
       const url = q ? `/api/memories?q=${encodeURIComponent(q)}` : '/api/memories'
       const memories = await fetch(url).then(r => r.json())
@@ -533,12 +714,12 @@
     }
 
     function render(memories) {
-      const grid = document.getElementById('grid')
+      const grid  = document.getElementById('grid')
       const count = document.getElementById('count')
       count.textContent = `${memories.length} memor${memories.length === 1 ? 'y' : 'ies'}`
 
       if (memories.length === 0) {
-        grid.innerHTML = '<div class="empty">No memories found.</div>'
+        grid.innerHTML = `<div class="empty"><div class="empty-icon">◯</div>No memories found.</div>`
         return
       }
 
@@ -547,9 +728,9 @@
           <div class="card-head">
             <span class="badge type-badge" style="--color:${TYPE_COLORS[m.type] || '#888'}">${m.type}</span>
             <span class="badge domain-badge">${esc(m.domain)}</span>
-            <button class="del-btn" data-id="${m.id}" title="Delete">✕</button>
+            <button class="card-menu-btn" data-id="${m.id}" title="Options">···</button>
           </div>
-          <div class="card-content">${esc(m.content)}</div>
+          <div class="card-content" data-id="${m.id}">${esc(m.content)}</div>
           <div class="card-foot">
             <div class="conf-wrap">
               <div class="conf-track"><div class="conf-fill" style="width:${m.confidence * 100}%"></div></div>
@@ -560,57 +741,108 @@
         </div>
       `).join('')
 
-      grid.querySelectorAll('.del-btn').forEach(btn => {
+      grid.querySelectorAll('.card-menu-btn').forEach(btn => {
         btn.addEventListener('click', e => {
           e.stopPropagation()
-          deleteMemory(btn.dataset.id)
+          openDropdown(btn, btn.dataset.id)
         })
       })
-
-      grid.querySelectorAll('.card').forEach(card => {
-        card.addEventListener('click', () => openEdit(card.dataset.id))
+      grid.querySelectorAll('.card-content').forEach(el => {
+        el.addEventListener('click', () => openEdit(el.dataset.id))
       })
     }
 
-    // ── Delete ──────────────────────────────────────
-    async function deleteMemory(id) {
+    // ── Dropdown ──────────────────────────────────────────
+    const dropdown = document.getElementById('dropdown')
+
+    function openDropdown(btn, id) {
+      if (dropTargetId === id && dropdown.classList.contains('open')) {
+        closeDropdown(); return
+      }
+      document.querySelectorAll('.card-menu-btn.active').forEach(b => b.classList.remove('active'))
+      btn.classList.add('active')
+      dropTargetId = id
+
+      const rect = btn.getBoundingClientRect()
+      const ddW  = 168
+      const left = Math.min(rect.right - ddW, window.innerWidth - ddW - 8)
+      const top  = rect.bottom + 4
+      dropdown.style.left = `${Math.max(8, left)}px`
+      dropdown.style.top  = `${top}px`
+      dropdown.classList.add('open')
+    }
+
+    function closeDropdown() {
+      dropdown.classList.remove('open')
+      document.querySelectorAll('.card-menu-btn.active').forEach(b => b.classList.remove('active'))
+      dropTargetId = null
+    }
+
+    document.addEventListener('click', e => {
+      if (!dropdown.contains(e.target) && !e.target.classList.contains('card-menu-btn')) {
+        closeDropdown()
+      }
+    })
+
+    document.getElementById('dd-edit').addEventListener('click', () => {
+      const id = dropTargetId; closeDropdown(); openEdit(id)
+    })
+    document.getElementById('dd-move').addEventListener('click', () => {
+      const id = dropTargetId; closeDropdown(); openEdit(id, true)
+    })
+    document.getElementById('dd-delete').addEventListener('click', () => {
+      const id = dropTargetId; closeDropdown(); deleteMemoryWithConfirm(id)
+    })
+
+    // ── Delete memory ─────────────────────────────────────
+    async function deleteMemoryWithConfirm(id) {
+      const memories = await fetch('/api/memories').then(r => r.json())
+      const m = memories.find(x => x.id === id)
+      const preview = m ? m.content.slice(0, 72) + (m.content.length > 72 ? '…' : '') : id
+      const confirmed = await showConfirm({
+        icon:  '🗑',
+        title: 'Delete memory?',
+        desc:  `<em style="color:var(--dim2);font-style:italic">"${esc(preview)}"</em>`,
+        label: 'Delete',
+      })
+      if (!confirmed) return
       await fetch(`/api/memories/${id}`, { method: 'DELETE' })
+      loadScopes()
       load(document.getElementById('search').value)
     }
 
-    // ── Edit modal ──────────────────────────────────
-    let cachedMemories = []
-
-    async function openEdit(id) {
+    // ── Edit modal ────────────────────────────────────────
+    async function openEdit(id, focusMove = false) {
       const [memories, { scopes, active }] = await Promise.all([
         fetch('/api/memories').then(r => r.json()),
         fetch('/api/scopes').then(r => r.json()),
       ])
-      cachedMemories = memories
       const m = memories.find(x => x.id === id)
       if (!m) return
 
       editingId = id
-      document.getElementById('edit-content').value = m.content
-      document.getElementById('edit-domain').value = m.domain
-      document.getElementById('edit-type').value = m.type
-      document.getElementById('edit-importance').value = m.importance
+      document.getElementById('edit-content').value        = m.content
+      document.getElementById('edit-domain').value         = m.domain
+      document.getElementById('edit-type').value           = m.type
+      document.getElementById('edit-importance').value     = m.importance
       document.getElementById('importance-val').textContent = m.importance.toFixed(1)
 
-      // Populate "move to scope" dropdown
-      const moveSelect = document.getElementById('edit-move-scope')
-      const otherScopes = scopes.filter(s => s !== active)
+      const moveSelect  = document.getElementById('edit-move-scope')
+      const otherScopes = scopes.filter(s => s.name !== active)
       moveSelect.innerHTML = '<option value="">— keep in current scope —</option>'
-      otherScopes.forEach(s => {
+      otherScopes.forEach(({ name }) => {
         const opt = document.createElement('option')
-        opt.value = s
-        opt.textContent = s
+        opt.value = name; opt.textContent = name
         moveSelect.appendChild(opt)
       })
       document.getElementById('move-field').style.display = otherScopes.length > 0 ? '' : 'none'
 
       document.getElementById('overlay').classList.remove('hidden')
-      document.getElementById('edit-content').focus()
+      if (focusMove && otherScopes.length > 0) {
+        document.getElementById('edit-move-scope').focus()
+      } else {
+        document.getElementById('edit-content').focus()
+      }
     }
 
     function closeModal() {
@@ -623,23 +855,21 @@
       const targetScope = document.getElementById('edit-move-scope').value
 
       if (targetScope) {
-        // Move to another scope first, then update fields in target
         await fetch(`/api/memories/${editingId}/move`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ targetScope }),
         })
       } else {
-        const body = {
-          content:    document.getElementById('edit-content').value.trim(),
-          type:       document.getElementById('edit-type').value,
-          domain:     document.getElementById('edit-domain').value.trim(),
-          importance: parseFloat(document.getElementById('edit-importance').value),
-        }
         await fetch(`/api/memories/${editingId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
+          body: JSON.stringify({
+            content:    document.getElementById('edit-content').value.trim(),
+            type:       document.getElementById('edit-type').value,
+            domain:     document.getElementById('edit-domain').value.trim(),
+            importance: parseFloat(document.getElementById('edit-importance').value),
+          }),
         })
       }
       closeModal()
@@ -647,7 +877,7 @@
       load(document.getElementById('search').value)
     }
 
-    // ── Utils ───────────────────────────────────────
+    // ── Utils ─────────────────────────────────────────────
     function esc(str) {
       return String(str)
         .replace(/&/g, '&amp;')
@@ -660,16 +890,16 @@
       return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     }
 
-    // ── Events ──────────────────────────────────────
+    // ── Events ────────────────────────────────────────────
     let searchTimer
     document.getElementById('search').addEventListener('input', e => {
       clearTimeout(searchTimer)
       searchTimer = setTimeout(() => load(e.target.value), 180)
     })
 
-    document.getElementById('refresh').addEventListener('click', () =>
-      load(document.getElementById('search').value)
-    )
+    document.getElementById('refresh').addEventListener('click', () => {
+      loadScopes(); load(document.getElementById('search').value)
+    })
 
     document.getElementById('edit-importance').addEventListener('input', e => {
       document.getElementById('importance-val').textContent = parseFloat(e.target.value).toFixed(1)
@@ -678,17 +908,16 @@
     document.getElementById('btn-save').addEventListener('click', saveEdit)
     document.getElementById('btn-cancel').addEventListener('click', closeModal)
     document.getElementById('close-modal').addEventListener('click', closeModal)
-
     document.getElementById('overlay').addEventListener('click', e => {
       if (e.target === e.currentTarget) closeModal()
     })
 
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') closeModal()
+      if (e.key === 'Escape') { closeModal(); closeDropdown(); closeConfirm(false) }
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') saveEdit()
     })
 
-    // ── Init ────────────────────────────────────────
+    // ── Init ──────────────────────────────────────────────
     loadScopes()
     load()
   </script>

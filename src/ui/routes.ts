@@ -17,7 +17,12 @@ export async function handleRequest(req: Request): Promise<Response> {
 
   // GET /api/scopes
   if (pathname === "/api/scopes" && req.method === "GET") {
-    return Response.json({ scopes: listScopes(), active: readCurrentScope() })
+    const active = readCurrentScope()
+    const scopes = listScopes().map(name => ({
+      name,
+      count: loadStore(name).memories.length,
+    }))
+    return Response.json({ scopes, active })
   }
 
   // DELETE /api/scopes/:name
