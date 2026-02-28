@@ -34,10 +34,11 @@ async function _handleRequest(req: Request): Promise<Response> {
 
   // ── API ──────────────────────────────────────────────────────────────────
 
-  // GET /api/context  — plain text context for browser extension injection
+  // GET /api/context[?scope=name]  — plain text context for browser extension injection
   if (pathname === "/api/context" && req.method === "GET") {
-    const store = loadStore()
-    const scope = readCurrentScope()
+    const scopeParam = url.searchParams.get("scope") ?? undefined
+    const store = loadStore(scopeParam)
+    const scope = scopeParam ?? readCurrentScope()
     const lines: string[] = [
       "This is the user's persistent memory context. Use it silently as background knowledge.\n",
     ]
