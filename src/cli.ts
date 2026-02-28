@@ -235,9 +235,17 @@ const c = {
 }
 
 const CONNECTOR_HINTS: Record<string, string> = {
-  gemini: "Google Gemini CLI",
-  claude: "Claude Code CLI",
-  codex:  "OpenAI Codex CLI",
+  gemini:          "Google Gemini CLI",
+  claude:          "Claude Code CLI",
+  codex:           "OpenAI Codex CLI",
+  opencode:        "OpenCode AI coding agent",
+  aider:           "Aider AI pair programmer",
+  sgpt:            "ShellGPT",
+  goose:           "Block Goose developer agent",
+  groq:            "Groq code CLI",
+  ollama:          "Ollama local models",
+  "cursor-agent":  "Cursor Agent CLI",
+  droid:           "Factory Droid agent",
 }
 
 function printMemoryAscii(): void {
@@ -257,10 +265,28 @@ function printMemoryAscii(): void {
 //   system-prompt → `cli --append-system-prompt "<ctx>"` (claude)
 //   positional    → `cli "<context>"`                   (codex)
 //   stdin         → pipe context via stdin
-const SUPPORTED_CONNECTORS: Array<{ name: string; bin: string; mode: "flag" | "system-prompt" | "positional" | "stdin"; flag?: string }> = [
-  { name: "gemini", bin: join(BUN_BIN, "gemini"), mode: "flag",          flag: "-i"                    },
-  { name: "claude", bin: join(BUN_BIN, "claude"), mode: "system-prompt", flag: "--append-system-prompt" },
-  { name: "codex",  bin: join(BUN_BIN, "codex"),  mode: "positional"                                   },
+const SUPPORTED_CONNECTORS: Array<{ name: string; bin: string; mode: string; flag?: string }> = [
+  // ── Existing ─────────────────────────────────────────────────────────────────
+  { name: "gemini",         bin: join(BUN_BIN,   "gemini"),        mode: "flag",              flag: "-i"                     },
+  { name: "claude",         bin: join(BUN_BIN,   "claude"),        mode: "system-prompt",     flag: "--append-system-prompt" },
+  { name: "codex",          bin: join(BUN_BIN,   "codex"),         mode: "positional"                                        },
+  // ── New ──────────────────────────────────────────────────────────────────────
+  // opencode: --prompt pre-fills TUI; run is headless
+  { name: "opencode",       bin: join(BUN_BIN,   "opencode"),      mode: "tui-prompt"                                        },
+  // aider: no --system flag; inject via --read <tmpfile>
+  { name: "aider",          bin: join(LOCAL_BIN, "aider"),         mode: "read-file",         flag: "--read"                 },
+  // sgpt: context via stdin, query as positional arg
+  { name: "sgpt",           bin: join(LOCAL_BIN, "sgpt"),          mode: "sgpt"                                              },
+  // goose: run --system injects context; -s keeps session open
+  { name: "goose",          bin: join(LOCAL_BIN, "goose"),         mode: "goose"                                             },
+  // groq: --system flag, interactive only
+  { name: "groq",           bin: join(BUN_BIN,   "groq"),          mode: "system-interactive", flag: "--system"              },
+  // ollama: no --system flag; positional with model name
+  { name: "ollama",         bin: "/usr/local/bin/ollama",          mode: "ollama"                                            },
+  // cursor-agent: no system prompt; -p for headless tasks
+  { name: "cursor-agent",   bin: join(LOCAL_BIN, "cursor-agent"),  mode: "cursor-agent"                                      },
+  // droid: uses exec subcommand
+  { name: "droid",          bin: join(BUN_BIN,   "droid"),         mode: "droid"                                             },
 ]
 
 function isAvailable(bin: string): boolean {
@@ -284,27 +310,98 @@ function ensureInPath(rc: string, dir: string, label: string): boolean {
 }
 
 function makeWrapper(binPath: string, mode: string, flag?: string): string {
+  const header = `#!/usr/bin/env bash
+MEMORY_DIR="${INSTALL_DIR}"
+CONTEXT=$("$MEMORY_DIR/memory" context 2>/dev/null)
+`
+  // ── Modes with fully custom templates ───────────────────────────────────────
+
+  if (mode === "read-file" && flag) {
+    // aider: no system-prompt flag — inject context via --read <tmpfile>
+    // uses trap (not exec) so temp file is cleaned up on exit
+    return header + `
+if [ -z "$CONTEXT" ]; then
+  exec "${binPath}" "$@"
+else
+  TMPFILE=$(mktemp /tmp/memory-XXXXXX.md)
+  printf '%s\\n' "$CONTEXT" > "$TMPFILE"
+  trap 'rm -f "$TMPFILE"' EXIT
+  "${binPath}" ${flag} "$TMPFILE" "$@"
+fi
+`
+  }
+
+  if (mode === "ollama") {
+    // ollama has no --system CLI flag; inject context as initial positional prompt
+    // model name is configurable via OLLAMA_MODEL env var
+    return header + `
+MODEL=\${OLLAMA_MODEL:-llama3.2}
+if [ -z "$CONTEXT" ]; then
+  exec "${binPath}" run "$MODEL" "$@"
+elif [ "$#" -gt 0 ]; then
+  exec "${binPath}" run "$MODEL" "Context: $CONTEXT\\n\\nTask: $*"
+else
+  exec "${binPath}" run "$MODEL"
+fi
+`
+  }
+
+  // ── Standard template modes ──────────────────────────────────────────────────
+
   let interactiveCmd: string
   let nonInteractiveCmd: string
 
   if (mode === "system-prompt" && flag) {
     interactiveCmd    = `exec "${binPath}" "${flag}" "$CONTEXT"`
     nonInteractiveCmd = `"${binPath}" -p "${flag}" "$CONTEXT" "$*"`
+
   } else if (mode === "flag" && flag) {
     interactiveCmd    = `exec "${binPath}" "${flag}" "$CONTEXT"`
     nonInteractiveCmd = `printf '%s\\n\\nUser query: %s\\n' "$CONTEXT" "$*" | "${binPath}" -p "$*"`
+
+  } else if (mode === "system-interactive" && flag) {
+    // CLIs with --system flag but no non-interactive mode (groq)
+    interactiveCmd    = `exec "${binPath}" "${flag}" "$CONTEXT"`
+    nonInteractiveCmd = `exec "${binPath}" "${flag}" "$CONTEXT"`
+
+  } else if (mode === "goose") {
+    // goose run --system injects context; -s keeps the session open
+    interactiveCmd    = `exec "${binPath}" run --system "$CONTEXT" -s`
+    nonInteractiveCmd = `exec "${binPath}" run --system "$CONTEXT" -t "$*"`
+
+  } else if (mode === "tui-prompt") {
+    // opencode: --prompt pre-fills the TUI; run is headless batch mode
+    interactiveCmd    = `exec "${binPath}" --prompt "$CONTEXT"`
+    nonInteractiveCmd = `exec "${binPath}" run "$CONTEXT — $*"`
+
+  } else if (mode === "sgpt") {
+    // sgpt: context piped via stdin, user query as positional arg
+    // --repl starts persistent interactive session (no context injection possible)
+    interactiveCmd    = `exec "${binPath}" --repl memory-session`
+    nonInteractiveCmd = `printf '%s\\n' "$CONTEXT" | "${binPath}" "$*"`
+
+  } else if (mode === "cursor-agent") {
+    // cursor-agent: no system-prompt flag; -p is headless mode
+    // interactive mode starts without context injection
+    interactiveCmd    = `exec "${binPath}"`
+    nonInteractiveCmd = `exec "${binPath}" -p "Context: $CONTEXT — $*"`
+
+  } else if (mode === "droid") {
+    // droid uses exec subcommand for task execution
+    interactiveCmd    = `exec "${binPath}" exec "$CONTEXT"`
+    nonInteractiveCmd = `exec "${binPath}" exec "$CONTEXT — $*"`
+
   } else if (mode === "positional") {
     interactiveCmd    = `exec "${binPath}" "$CONTEXT"`
     nonInteractiveCmd = `printf '%s\\n\\nUser query: %s\\n' "$CONTEXT" "$*" | "${binPath}" -p "$*"`
+
   } else {
+    // stdin fallback
     interactiveCmd    = `printf '%s\\n\\n' "$CONTEXT" | exec "${binPath}"`
     nonInteractiveCmd = `printf '%s\\n\\nUser query: %s\\n' "$CONTEXT" "$*" | "${binPath}" -p "$*"`
   }
 
-  return `#!/usr/bin/env bash
-MEMORY_DIR="${INSTALL_DIR}"
-CONTEXT=$("$MEMORY_DIR/memory" context 2>/dev/null)
-
+  return header + `
 if [ -z "$CONTEXT" ]; then
   exec "${binPath}" "$@"
 elif [ "$#" -gt 0 ]; then
