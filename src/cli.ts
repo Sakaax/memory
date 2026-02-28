@@ -332,10 +332,11 @@ fi
   }
 
   if (mode === "ollama") {
-    // ollama has no --system CLI flag; inject context via stdin pipe
-    // auto-detect first installed model if OLLAMA_MODEL not set
+    // ollama has no --system CLI flag
+    // non-interactive: pipe context+task via stdin
+    // interactive: create a temp model with context as SYSTEM prompt via Modelfile
     return header + `
-MODEL=\${OLLAMA_MODEL:-$(ollama list 2>/dev/null | awk 'NR==2{print $1}')}
+MODEL=\${OLLAMA_MODEL:-$(ollama list 2>/dev/null | awk 'NR==2{print \$1}')}
 if [ -z "$MODEL" ]; then
   printf '[memory] ollama: no model found. Set OLLAMA_MODEL=<model> or run: ollama pull llama3.2\\n' >&2
   exit 1
@@ -345,7 +346,12 @@ if [ -z "$CONTEXT" ]; then
 elif [ "$#" -gt 0 ]; then
   printf 'Context:\\n%s\\n\\nTask: %s\\n' "$CONTEXT" "$*" | "${binPath}" run "$MODEL"
 else
-  exec "${binPath}" run "$MODEL"
+  TMPFILE=$(mktemp /tmp/Modelfile-XXXXXX)
+  TMPMODEL="memory-session-$$"
+  printf 'FROM %s\\nSYSTEM """\\n%s\\n"""\\n' "$MODEL" "$CONTEXT" > "$TMPFILE"
+  "${binPath}" create "$TMPMODEL" -f "$TMPFILE" > /dev/null 2>&1
+  trap '"${binPath}" rm "$TMPMODEL" > /dev/null 2>&1; rm -f "$TMPFILE"' EXIT
+  "${binPath}" run "$TMPMODEL"
 fi
 `
   }
