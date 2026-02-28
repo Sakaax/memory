@@ -1,5 +1,5 @@
 import { join } from "path"
-import { existsSync } from "fs"
+import { existsSync, rmSync } from "fs"
 import {
   loadStore, saveStore, VALID_TYPES,
   listScopes, readCurrentScope, writeCurrentScope, scopeDir,
@@ -18,6 +18,23 @@ export async function handleRequest(req: Request): Promise<Response> {
   // GET /api/scopes
   if (pathname === "/api/scopes" && req.method === "GET") {
     return Response.json({ scopes: listScopes(), active: readCurrentScope() })
+  }
+
+  // DELETE /api/scopes/:name
+  if (pathname.match(/^\/api\/scopes\/[^/]+$/) && req.method === "DELETE") {
+    const name = decodeURIComponent(pathname.split("/")[3])
+    if (name === "global") {
+      return Response.json({ error: "cannot delete the global scope" }, { status: 400 })
+    }
+    if (name === readCurrentScope()) {
+      return Response.json({ error: "cannot delete the active scope — switch to another first" }, { status: 400 })
+    }
+    const dir = scopeDir(name)
+    if (!existsSync(dir)) {
+      return Response.json({ error: "scope not found" }, { status: 404 })
+    }
+    rmSync(dir, { recursive: true, force: true })
+    return Response.json({ ok: true })
   }
 
   // POST /api/scope  { scope: string }

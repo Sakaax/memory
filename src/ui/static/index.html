@@ -97,6 +97,9 @@
     }
 
     .scope-tab {
+      display: flex;
+      align-items: center;
+      gap: 5px;
       padding: 4px 11px;
       border-radius: 6px;
       font-size: 11px;
@@ -108,6 +111,7 @@
       color: var(--dim2);
       transition: all 0.15s;
       white-space: nowrap;
+      user-select: none;
     }
     .scope-tab:hover { color: var(--text); border-color: var(--border2); }
     .scope-tab.active {
@@ -115,6 +119,17 @@
       border-color: color-mix(in srgb, var(--accent) 35%, transparent);
       color: var(--accent);
     }
+
+    .scope-del {
+      font-size: 12px;
+      line-height: 1;
+      color: var(--dim);
+      opacity: 0;
+      transition: opacity 0.15s, color 0.15s;
+      padding: 0 1px;
+    }
+    .scope-tab:hover .scope-del { opacity: 1; }
+    .scope-del:hover { color: var(--danger); }
 
     /* ── Grid ──────────────────────────────────────── */
     main {
@@ -465,11 +480,26 @@
     async function loadScopes() {
       const { scopes, active } = await fetch('/api/scopes').then(r => r.json())
       const tabs = document.getElementById('scope-tabs')
-      tabs.innerHTML = scopes.map(s =>
-        `<button class="scope-tab ${s === active ? 'active' : ''}" data-scope="${esc(s)}">${esc(s)}</button>`
-      ).join('')
+      tabs.innerHTML = scopes.map(s => {
+        const isActive  = s === active
+        const canDelete = s !== 'global' && !isActive
+        const delBtn    = canDelete
+          ? `<span class="scope-del" data-scope="${esc(s)}" title="Delete scope">×</span>`
+          : ''
+        return `<div class="scope-tab ${isActive ? 'active' : ''}" data-scope="${esc(s)}">${esc(s)}${delBtn}</div>`
+      }).join('')
+
       tabs.querySelectorAll('.scope-tab').forEach(tab => {
-        tab.addEventListener('click', () => switchScope(tab.dataset.scope))
+        tab.addEventListener('click', (e) => {
+          if (e.target.classList.contains('scope-del')) return
+          switchScope(tab.dataset.scope)
+        })
+      })
+      tabs.querySelectorAll('.scope-del').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation()
+          deleteScope(btn.dataset.scope)
+        })
       })
     }
 
@@ -481,6 +511,18 @@
       })
       await loadScopes()
       await load(document.getElementById('search').value)
+    }
+
+    async function deleteScope(scope) {
+      if (!confirm(`Delete scope "${scope}" and all its memories?\nThis cannot be undone.`)) return
+      const res = await fetch(`/api/scopes/${encodeURIComponent(scope)}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const { error } = await res.json()
+        alert(error)
+        return
+      }
+      await loadScopes()
+      load(document.getElementById('search').value)
     }
 
     // ── Load & render ───────────────────────────────

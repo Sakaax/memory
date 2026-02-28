@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { existsSync, mkdirSync, appendFileSync, symlinkSync, unlinkSync, readFileSync, writeFileSync, watch } from "fs"
+import { existsSync, mkdirSync, appendFileSync, symlinkSync, unlinkSync, readFileSync, writeFileSync, watch, rmSync } from "fs"
 import { join } from "path"
 import {
   loadStore, saveStore, VALID_TYPES,
@@ -751,12 +751,36 @@ function cmdScope(args: string[]): void {
       break
     }
 
+    case "delete": {
+      if (!name) {
+        console.error("Usage: memory scope delete <name>")
+        process.exit(1)
+      }
+      if (name === "global") {
+        console.error(`Cannot delete the "global" scope.`)
+        process.exit(1)
+      }
+      if (name === readCurrentScope()) {
+        console.error(`Cannot delete the active scope. Switch first: memory scope use global`)
+        process.exit(1)
+      }
+      const dir = scopeDir(name)
+      if (!existsSync(dir)) {
+        console.error(`Scope "${name}" not found.`)
+        process.exit(1)
+      }
+      rmSync(dir, { recursive: true, force: true })
+      console.log(`Deleted scope: ${c.yellow}${name}${c.reset}`)
+      break
+    }
+
     default: {
-      console.log(`Usage: memory scope <list|use|create> [name]
+      console.log(`Usage: memory scope <list|use|create|delete> [name]
 
   ${c.green}scope list${c.reset}           Show all scopes
   ${c.green}scope use${c.reset}  ${c.dim}<name>${c.reset}    Switch active scope
-  ${c.green}scope create${c.reset} ${c.dim}<name>${c.reset}  Create a new project scope`)
+  ${c.green}scope create${c.reset} ${c.dim}<name>${c.reset}  Create a new project scope
+  ${c.green}scope delete${c.reset} ${c.dim}<name>${c.reset}  Delete a project scope and its memories`)
       break
     }
   }

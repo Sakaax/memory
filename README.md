@@ -111,6 +111,7 @@ Scopes let you maintain independent memory contexts — one for global preferenc
 memory scope list              # list all scopes, show active
 memory scope create <name>     # create a new project scope
 memory scope use <name>        # switch active scope
+memory scope delete <name>     # delete a scope and all its memories
 ```
 
 All commands (`remember`, `recall`, `forget`, etc.) operate on the active scope automatically.
@@ -307,6 +308,8 @@ Output:
 memory ui                      # open local web interface at http://127.0.0.1:7711
 ```
 
+See [Local UI](#local-ui) for the full feature list.
+
 ### Help
 
 ```bash
@@ -395,11 +398,21 @@ memory ui
 
 Opens a local web interface at `http://127.0.0.1:7711`.
 
-- Browse all memories in a card grid
+**Scope management (header)**
+- Scope tabs — click to instantly switch scope and reload memories
+- `×` button on non-global tabs — delete a project scope and all its memories (with confirmation)
+- Active scope highlighted in green
+
+**Memory cards**
+- Browse all memories in a card grid, sorted by importance then confidence
 - Live search by content, type, or domain
-- Edit memory content, type, domain, and importance
-- Delete memories
 - Confidence bar and date on each card
+- `×` on hover — delete a memory
+
+**Edit modal** (click any card)
+- Edit content, type, domain, importance
+- **Move to scope** — dropdown to transfer a memory from the current scope to any other
+- `Ctrl+Enter` to save, `Escape` to close
 
 Press `Ctrl+C` to stop the server. No background process.
 
@@ -473,7 +486,8 @@ memory/
 - [x] AI write-back — AIs store memories autonomously via injected context
 - [x] `memory resume` — AIs store session summaries at end of conversation
 - [x] Project-scoped connectors — `gemini-memory-myapp` injects only project memories
-- [x] Scopes — independent memory contexts per project
+- [x] Scopes — independent memory contexts per project (`create` / `use` / `delete`)
+- [x] Local UI — scope switcher, move memory between scopes, delete scope
 - [x] Hooks — local scripts triggered on memory events
 - [x] Watch — live memory change stream
 - [x] 11 connectors — Claude, Gemini, Codex, OpenCode, Aider, ShellGPT, Goose, Groq, Ollama, Cursor Agent, Droid
