@@ -1,6 +1,7 @@
 import { join } from "path"
 import { existsSync } from "fs"
 import { loadStore, saveStore, VALID_TYPES, type MemoryType } from "../store"
+import { runHook } from "../hooks"
 
 const STATIC_DIR = join(import.meta.dir, "static")
 
@@ -36,14 +37,15 @@ export async function handleRequest(req: Request): Promise<Response> {
   if (pathname.startsWith("/api/memories/") && req.method === "DELETE") {
     const id = pathname.split("/").pop()!
     const store = loadStore()
-    const before = store.memories.length
+    const target = store.memories.find((m) => m.id === id)
     store.memories = store.memories.filter((m) => m.id !== id)
 
-    if (store.memories.length === before) {
+    if (!target) {
       return Response.json({ error: "not found" }, { status: 404 })
     }
 
     saveStore(store)
+    runHook("on-memory-deleted", target)
     return Response.json({ ok: true })
   }
 
@@ -73,6 +75,7 @@ export async function handleRequest(req: Request): Promise<Response> {
     memory.updated_at = new Date().toISOString()
 
     saveStore(store)
+    runHook("on-memory-updated", memory)
     return Response.json(memory)
   }
 

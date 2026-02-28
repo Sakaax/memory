@@ -1,7 +1,14 @@
 #!/usr/bin/env bun
-import { existsSync, mkdirSync, appendFileSync, symlinkSync, unlinkSync, readFileSync, writeFileSync } from "fs"
+import { existsSync, mkdirSync, appendFileSync, symlinkSync, unlinkSync, readFileSync, writeFileSync, watch } from "fs"
 import { join } from "path"
-import { loadStore, saveStore, VALID_TYPES, MEMORY_FILE, type Memory, type MemoryType } from "./store"
+import {
+  loadStore, saveStore, VALID_TYPES,
+  MEMORY_HOME, HOOKS_DIR,
+  readCurrentScope, writeCurrentScope, scopeDir, scopeFile, listScopes,
+  isWritable, detectScope,
+  type Memory, type MemoryType,
+} from "./store"
+import { runHook } from "./hooks"
 
 const INSTALL_DIR = join(import.meta.dir, "..")
 const HOME = process.env.HOME ?? ""
@@ -66,6 +73,7 @@ function cmdRemember(args: string[]): void {
     existing.confidence = Math.min(1, existing.confidence + 0.1)
     existing.updated_at = new Date().toISOString()
     saveStore(store)
+    runHook("on-memory-updated", existing)
     console.log(
       `Updated: [${existing.id}] "${content}" (confidence: ${existing.confidence.toFixed(2)})`
     )
@@ -86,6 +94,7 @@ function cmdRemember(args: string[]): void {
 
   store.memories.push(memory)
   saveStore(store)
+  runHook("on-memory-added", memory)
   console.log(`Stored: [${memory.id}] "${content}" (${type}/${domain})`)
 }
 
@@ -168,6 +177,7 @@ function cmdForget(args: string[]): void {
 
   const store = loadStore()
   const before = store.memories.length
+  const target = store.memories.find((m) => m.id === id)
   store.memories = store.memories.filter((m) => m.id !== id)
 
   if (store.memories.length === before) {
@@ -176,6 +186,7 @@ function cmdForget(args: string[]): void {
   }
 
   saveStore(store)
+  runHook("on-memory-deleted", target!)
   console.log(`Forgotten: [${id}]`)
 }
 
@@ -463,6 +474,159 @@ async function cmdUninstall(): Promise<void> {
   outro(`Run ${c.green}memory setup${c.reset} to reinstall anytime.`)
 }
 
+function cmdDoctor(): void {
+  const ok  = `${c.green}✔${c.reset}`
+  const err = `${c.yellow}✗${c.reset}`
+
+  const activeScope = readCurrentScope()
+  const activeFile  = scopeFile(activeScope)
+  const homeOk      = existsSync(MEMORY_HOME)
+  const fileOk      = existsSync(activeFile)
+  const writable    = homeOk && isWritable(MEMORY_HOME)
+  const hooksOk     = existsSync(HOOKS_DIR)
+  const scopes      = listScopes()
+  const envScope    = detectScope()
+
+  const store = fileOk ? loadStore() : { memories: [] }
+  const count = store.memories.length
+
+  let version = "unknown"
+  try {
+    const pkg = JSON.parse(readFileSync(join(INSTALL_DIR, "package.json"), "utf-8"))
+    version = pkg.version ?? "unknown"
+  } catch { /* ignore */ }
+
+  console.log(`\n  ${c.bold}memory doctor${c.reset}  ${c.dim}v${version}${c.reset}\n`)
+  console.log(`  ${homeOk   ? ok : err} MEMORY_HOME    ${c.dim}${MEMORY_HOME}${c.reset}`)
+  console.log(`  ${fileOk   ? ok : err} storage        ${c.dim}${activeFile}${c.reset}`)
+  console.log(`  ${writable ? ok : err} writable`)
+  console.log(`  ${ok} memories       ${c.dim}${count}${c.reset}`)
+  console.log(`  ${hooksOk  ? ok : err} hooks          ${c.dim}${HOOKS_DIR}${c.reset}`)
+  console.log(`  ${ok} active scope   ${c.dim}${activeScope}${c.reset}`)
+  console.log(`  ${ok} all scopes     ${c.dim}${scopes.join(", ") || "none"}${c.reset}`)
+  console.log(`  ${ok} MEMORY_HOME level  ${c.dim}${envScope}${c.reset}`)
+
+  if (!homeOk || !fileOk || !writable) {
+    console.log(`\n  ${c.yellow}Run ${c.bold}memory setup${c.reset}${c.yellow} to initialize.${c.reset}`)
+  }
+
+  console.log()
+}
+
+function cmdScope(args: string[]): void {
+  const [sub, name] = args
+
+  switch (sub) {
+    case "list": {
+      const scopes  = listScopes()
+      const current = readCurrentScope()
+      if (scopes.length === 0) {
+        console.log("No scopes found.")
+        return
+      }
+      for (const s of scopes) {
+        const active = s === current ? `  ${c.green}← active${c.reset}` : ""
+        console.log(`  ${s}${active}`)
+      }
+      break
+    }
+
+    case "use": {
+      if (!name) {
+        console.error("Usage: memory scope use <name>")
+        process.exit(1)
+      }
+      if (!existsSync(scopeDir(name))) {
+        console.error(`Scope "${name}" not found. Run: memory scope create ${name}`)
+        process.exit(1)
+      }
+      writeCurrentScope(name)
+      console.log(`Switched to scope: ${c.green}${name}${c.reset}`)
+      break
+    }
+
+    case "create": {
+      if (!name) {
+        console.error("Usage: memory scope create <name>")
+        process.exit(1)
+      }
+      if (name === "global") {
+        console.error(`"global" is a reserved scope name.`)
+        process.exit(1)
+      }
+      const dir = scopeDir(name)
+      if (existsSync(dir)) {
+        console.log(`Scope "${name}" already exists.`)
+        return
+      }
+      mkdirSync(dir, { recursive: true })
+      console.log(`Created scope: ${c.green}${name}${c.reset}`)
+      console.log(`${c.dim}Switch to it: memory scope use ${name}${c.reset}`)
+      break
+    }
+
+    default: {
+      console.log(`Usage: memory scope <list|use|create> [name]
+
+  ${c.green}scope list${c.reset}           Show all scopes
+  ${c.green}scope use${c.reset}  ${c.dim}<name>${c.reset}    Switch active scope
+  ${c.green}scope create${c.reset} ${c.dim}<name>${c.reset}  Create a new project scope`)
+      break
+    }
+  }
+}
+
+async function cmdWatch(): Promise<void> {
+  const scope = readCurrentScope()
+  const file  = scopeFile(scope)
+  const dir   = scopeDir(scope)
+
+  // Ensure file exists before watching
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+  if (!existsSync(file)) writeFileSync(file, JSON.stringify({ memories: [] }, null, 2) + "\n")
+
+  let prev = loadStore()
+
+  // Status info → stderr so stdout stays clean for piping
+  process.stderr.write(`watching scope=${scope}\nfile=${file}\n\n`)
+
+  watch(file, () => {
+    let next: ReturnType<typeof loadStore>
+    try {
+      next = loadStore()
+    } catch {
+      return // file mid-write — skip, next event will catch it
+    }
+
+    const prevMap = new Map(prev.memories.map((m) => [m.id, m]))
+    const nextMap = new Map(next.memories.map((m) => [m.id, m]))
+
+    for (const id of nextMap.keys()) {
+      if (!prevMap.has(id)) emit("memory_added",   id, scope)
+    }
+    for (const id of prevMap.keys()) {
+      if (!nextMap.has(id)) emit("memory_deleted", id, scope)
+    }
+    for (const [id, m] of nextMap) {
+      const old = prevMap.get(id)
+      if (old && old.updated_at !== m.updated_at) emit("memory_updated", id, scope)
+    }
+
+    prev = next
+  })
+
+  process.on("SIGINT", () => {
+    process.stderr.write("\nwatch stopped\n")
+    process.exit(0)
+  })
+
+  await new Promise(() => {}) // keep process alive
+}
+
+function emit(event: string, id: string, scope: string): void {
+  process.stdout.write(`EVENT ${event} id=${id} scope=${scope}\n`)
+}
+
 // ─── router ──────────────────────────────────────────────────────────────────
 
 function cmdHelp(): void {
@@ -483,6 +647,9 @@ ${c.bold}COMMANDS${c.reset}
 
   ${c.green}status${c.reset}     Show statistics.
   ${c.green}dump${c.reset}       Export all memories as JSON.
+  ${c.green}watch${c.reset}      Stream live memory change events.
+  ${c.green}doctor${c.reset}     Diagnose storage, permissions, and scopes.
+  ${c.green}scope${c.reset}      ${c.dim}list | use <name> | create <name>${c.reset}
   ${c.green}setup${c.reset}      Configure AI CLI connectors interactively.
   ${c.green}uninstall${c.reset}  Remove connectors interactively.
   ${c.green}ui${c.reset}         Launch local web interface at http://127.0.0.1:7711.
@@ -508,6 +675,9 @@ switch (command) {
   case "status":    cmdStatus();                          break
   case "forget":    cmdForget(rest);                      break
   case "context":   cmdContext();                         break
+  case "watch":     cmdWatch().catch(console.error);      break
+  case "doctor":    cmdDoctor();                          break
+  case "scope":     cmdScope(rest);                       break
   case "setup":     cmdSetup().catch(console.error);      break
   case "uninstall": cmdUninstall().catch(console.error);  break
   case "ui":        cmdUI().catch(console.error);         break

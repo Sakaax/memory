@@ -13,7 +13,7 @@ Claude doesn't know what you told Gemini.
 Gemini doesn't know what Codex learned.
 You keep re-explaining yourself.
 
-**memory** solves this by giving every AI the same shared context — a single JSON file on your machine.
+**memory** solves this by giving every AI the same shared context — stored locally on your machine.
 
 ---
 
@@ -22,9 +22,9 @@ You keep re-explaining yourself.
 ```
 memory remember "I use Bun, never npm"
         ↓
-   memory.json          ← single source of truth
+   ~/.memory/global/memory.json   ← single source of truth
    ↙    ↓    ↘
-Claude  Gemini  Codex   ← all read the same context
+Claude  Gemini  Codex             ← all read the same context
 ```
 
 Context is injected at session start. No API calls. No cloud. No setup beyond the CLI.
@@ -75,7 +75,7 @@ Storing the same content twice increases confidence automatically.
 ### Recall
 
 ```bash
-memory recall                  # all memories
+memory recall                  # all memories in active scope
 memory recall development      # filter by domain, type, or keyword
 ```
 
@@ -87,11 +87,151 @@ memory forget <id>             # delete by id
 memory dump                    # export full JSON
 ```
 
+### Scopes
+
+Scopes let you maintain independent memory contexts — one for global preferences, one per project.
+
+```bash
+memory scope list              # list all scopes, show active
+memory scope create <name>     # create a new project scope
+memory scope use <name>        # switch active scope
+```
+
+All commands (`remember`, `recall`, `forget`, etc.) operate on the active scope automatically.
+
+**Structure on disk:**
+
+```
+~/.memory/
+├── current_scope              ← active scope name
+├── global/
+│   └── memory.json            ← default scope
+└── projects/
+    └── <name>/
+        └── memory.json        ← project scope
+```
+
+**Example workflow:**
+
+```bash
+memory scope create myapp
+memory scope use myapp
+memory remember "uses PostgreSQL with Prisma" --type project --domain database
+memory scope use global        # back to global
+```
+
+### Watch
+
+Stream live memory change events from the active scope.
+
+```bash
+memory watch
+```
+
+Output:
+
+```
+watching scope=global
+file=/home/user/.memory/global/memory.json
+
+EVENT memory_added   id=abc123 scope=global
+EVENT memory_updated id=abc123 scope=global
+EVENT memory_deleted id=def456 scope=global
+```
+
+Events go to **stdout**. Status messages go to **stderr**. Designed for piping:
+
+```bash
+memory watch | grep memory_added
+memory watch | awk '{print $3}'
+memory watch | while read line; do echo "changed: $line"; done
+```
+
+Press `Ctrl+C` to stop.
+
+### Hooks
+
+Run local scripts automatically when memories change.
+
+Place executable scripts in `~/.memory/hooks/`:
+
+```
+~/.memory/hooks/
+├── on-memory-added.sh
+├── on-memory-updated.ts
+└── on-memory-deleted.sh
+```
+
+**Supported events:**
+
+| Hook | Triggered when |
+|---|---|
+| `on-memory-added` | A new memory is stored |
+| `on-memory-updated` | A memory is modified |
+| `on-memory-deleted` | A memory is removed |
+
+**Payload** — passed via stdin as JSON:
+
+```json
+{
+  "memory": {
+    "id": "abc123",
+    "type": "preference",
+    "content": "I use Bun, never npm or yarn",
+    "domain": "development",
+    "confidence": 0.8,
+    "importance": 0.5,
+    "source": "cli",
+    "created_at": "2026-02-28T13:33:08.463Z",
+    "updated_at": "2026-02-28T13:33:08.463Z"
+  },
+  "scope": "global",
+  "timestamp": "2026-02-28T13:33:08.463Z"
+}
+```
+
+**Supported formats:** `.ts` (runs with Bun), `.js` (runs with Bun), `.sh` (runs with bash), or any executable with a shebang.
+
+**Example hook** — notify on new memory:
+
+```bash
+#!/usr/bin/env bash
+PAYLOAD=$(cat)
+CONTENT=$(echo "$PAYLOAD" | grep -o '"content": "[^"]*"' | cut -d'"' -f4)
+echo "New memory: $CONTENT" | notify-send "memory" -
+```
+
+Hooks are:
+- **optional** — missing hooks are silently skipped
+- **non-blocking** — memory operation completes before the hook runs
+- **fail-safe** — if a hook crashes, only a log message is emitted
+
 ### Connectors
 
 ```bash
 memory setup                   # detect and install AI connectors interactively
 memory uninstall               # remove connectors interactively
+```
+
+### Diagnostics
+
+```bash
+memory doctor                  # check storage, permissions, scopes
+```
+
+Output:
+
+```
+  memory doctor  v0.3.0
+
+  ✔ MEMORY_HOME    /home/user/.memory
+  ✔ storage        /home/user/.memory/global/memory.json
+  ✔ writable
+  ✔ memories       42
+  ✗ hooks          /home/user/.memory/hooks
+  ✔ active scope   global
+  ✔ all scopes     global, myapp
+  ✔ MEMORY_HOME level  global
 ```
 
 ### UI
@@ -139,8 +279,6 @@ To remove connectors:
 ```bash
 memory uninstall
 ```
-
-Same interface — select which wrappers to delete.
 
 ---
 
@@ -210,16 +348,29 @@ Press `Ctrl+C` to stop the server. No background process.
 memory/
 ├── install.sh              one-liner installer
 ├── memory                  shell wrapper (entry point)
-├── memory.json             your data (gitignored)
 ├── src/
-│   ├── store.ts            shared data layer
+│   ├── store.ts            shared data layer + scope resolution
 │   ├── cli.ts              all commands
+│   ├── hooks.ts            hook runner (fire-and-forget)
 │   └── ui/
 │       ├── server.ts       Bun HTTP server (127.0.0.1:7711)
 │       ├── routes.ts       API routes
 │       └── static/
 │           └── index.html  local web interface
-└── docs/                   architecture and design notes
+```
+
+**Runtime directory** (`~/.memory/` by default, override with `MEMORY_HOME`):
+
+```
+~/.memory/
+├── current_scope           active scope name
+├── global/
+│   └── memory.json
+├── projects/
+│   └── <name>/
+│       └── memory.json
+└── hooks/
+    └── on-memory-added.sh  (optional)
 ```
 
 ---
