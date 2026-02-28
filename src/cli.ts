@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { existsSync, mkdirSync, appendFileSync, symlinkSync, unlinkSync, readFileSync, writeFileSync, watch, rmSync } from "fs"
+import { existsSync, mkdirSync, appendFileSync, symlinkSync, unlinkSync, readFileSync, writeFileSync, watch, rmSync, readdirSync, statSync } from "fs"
 import { join } from "path"
 import {
   loadStore, saveStore, VALID_TYPES,
@@ -786,6 +786,272 @@ function cmdScope(args: string[]): void {
   }
 }
 
+// ─── harvest ─────────────────────────────────────────────────────────────────
+
+interface HarvestCandidate {
+  text:   string
+  source: "user" | "bash"
+  type:   MemoryType
+  domain: string
+}
+
+function findLastClaudeSession(): string | null {
+  const claudeProjects = join(HOME, ".claude", "projects")
+  if (!existsSync(claudeProjects)) return null
+
+  let newest: { path: string; mtime: number } | null = null
+
+  try {
+    for (const proj of readdirSync(claudeProjects, { withFileTypes: true })) {
+      if (!proj.isDirectory()) continue
+      const projDir = join(claudeProjects, proj.name)
+      try {
+        for (const f of readdirSync(projDir)) {
+          if (!f.endsWith(".jsonl")) continue
+          const fp = join(projDir, f)
+          try {
+            const mtime = statSync(fp).mtimeMs
+            if (!newest || mtime > newest.mtime) newest = { path: fp, mtime }
+          } catch { /* unreadable — skip */ }
+        }
+      } catch { /* unreadable dir — skip */ }
+    }
+  } catch { /* ~/.claude/projects unreadable */ }
+
+  return newest?.path ?? null
+}
+
+function inferType(text: string): MemoryType {
+  const t = text.toLowerCase()
+  if (/\b(prefer|like|always|never|style|workflow|tool)\b/.test(t)) return "preference"
+  if (/\b(project|app|building|built|working on)\b/.test(t))        return "project"
+  if (/\b(decided|decision|chose|choosing|picked)\b/.test(t))       return "decision"
+  if (/\b(want|goal|aim|target|objective)\b/.test(t))               return "goal"
+  if (/\b(constraint|limit|restriction|must not|cannot)\b/.test(t)) return "constraint"
+  if (/\b(can|skill|know how|expert|familiar)\b/.test(t))           return "skill"
+  return "knowledge"
+}
+
+function inferDomain(text: string): string {
+  const t = text.toLowerCase()
+  if (/\b(code|dev|develop|typescript|javascript|bun|npm|git|framework|api|database|sql|prisma|next|react)\b/.test(t)) return "development"
+  if (/\b(design|ui|ux|css|tailwind|color|font|layout)\b/.test(t))  return "design"
+  if (/\b(mobile|expo|react native|ios|android)\b/.test(t))          return "mobile"
+  if (/\b(work|job|team|meeting|client|deadline)\b/.test(t))         return "work"
+  if (/\b(personal|life|family|health|baby)\b/.test(t))              return "personal"
+  return "general"
+}
+
+const HARVEST_PATTERNS = [
+  /\bi (use|prefer|want|need|always|never)\b/i,
+  /\bmy (stack|setup|project|app|preference|workflow|tool)\b/i,
+  /\b(always|never) use\b/i,
+  /\bimportant[:\s]/i,
+  /\bremember (this|that)\b/i,
+]
+
+function extractFromJSONL(raw: string): {
+  candidates:    HarvestCandidate[]
+  alreadyStored: string[]
+  parsed:        number
+} {
+  const candidates:    HarvestCandidate[] = []
+  const alreadyStored: string[]           = []
+  let parsed = 0
+
+  for (const line of raw.split("\n")) {
+    if (!line.trim()) continue
+    let entry: any
+    try { entry = JSON.parse(line) } catch { continue }
+    parsed++
+
+    const { type, message } = entry
+    if (!message) continue
+
+    // ── assistant: look for memory remember bash calls ────────────────────────
+    if (type === "assistant" && Array.isArray(message.content)) {
+      for (const block of message.content) {
+        if (block.type !== "tool_use" || block.name !== "Bash") continue
+        const cmd: string = block.input?.command ?? ""
+        const m = cmd.match(/memory remember\s+"([^"]+)"/)
+        if (m) alreadyStored.push(m[1])
+      }
+    }
+
+    // ── user: apply heuristic patterns ───────────────────────────────────────
+    if (type === "user") {
+      let text = ""
+      if (typeof message.content === "string") {
+        text = message.content
+      } else if (Array.isArray(message.content)) {
+        for (const block of message.content) {
+          if (block.type === "text") text += block.text + " "
+        }
+      }
+      text = text.trim()
+      if (!text || text.length < 10 || text.length > 500) continue
+
+      for (const pattern of HARVEST_PATTERNS) {
+        if (!pattern.test(text)) continue
+        const sentences = text.split(/[.!?\n]+/).map(s => s.trim()).filter(s => s.length > 8 && s.length < 200)
+        for (const sentence of sentences) {
+          if (pattern.test(sentence)) {
+            candidates.push({ text: sentence, source: "user", type: inferType(sentence), domain: inferDomain(sentence) })
+          }
+        }
+        break
+      }
+    }
+  }
+
+  return { candidates, alreadyStored, parsed }
+}
+
+function extractFromText(raw: string): { candidates: HarvestCandidate[]; parsed: number } {
+  const candidates: HarvestCandidate[] = []
+  let parsed = 0
+
+  for (const line of raw.split("\n")) {
+    const text = line.trim()
+    parsed++
+    if (!text || text.length < 10 || text.length > 300) continue
+
+    for (const pattern of HARVEST_PATTERNS) {
+      if (pattern.test(text)) {
+        candidates.push({ text, source: "user", type: inferType(text), domain: inferDomain(text) })
+        break
+      }
+    }
+  }
+
+  return { candidates, parsed }
+}
+
+async function cmdHarvest(args: string[]): Promise<void> {
+  const { intro, outro, multiselect, spinner, note, isCancel } = await import("@clack/prompts")
+
+  let filePath: string | null = null
+  let useLast = false
+
+  for (const arg of args) {
+    if (arg === "--last") useLast = true
+    else filePath = arg
+  }
+
+  if (useLast) {
+    filePath = findLastClaudeSession()
+    if (!filePath) {
+      console.error("No Claude Code session found in ~/.claude/projects/")
+      process.exit(1)
+    }
+  }
+
+  if (!filePath) {
+    console.error(`Usage:
+  memory harvest <session.jsonl>    parse a Claude Code session (structured)
+  memory harvest <transcript.txt>   parse any plain text transcript
+  memory harvest --last             parse the most recent Claude Code session
+
+Note: --last is Claude Code only. For other AIs, use write-back during session.`)
+    process.exit(1)
+  }
+
+  if (!existsSync(filePath)) {
+    console.error(`File not found: ${filePath}`)
+    process.exit(1)
+  }
+
+  intro(`${c.bold}  memory harvest  ${c.reset}`)
+
+  const s = spinner()
+  s.start("Parsing session…")
+
+  const raw    = readFileSync(filePath, "utf-8")
+  const isJsonl = filePath.endsWith(".jsonl")
+
+  let allCandidates: HarvestCandidate[] = []
+  let alreadyStored: string[]           = []
+  let parsed = 0
+
+  if (isJsonl) {
+    const result  = extractFromJSONL(raw)
+    allCandidates = result.candidates
+    alreadyStored = result.alreadyStored
+    parsed        = result.parsed
+  } else {
+    const result  = extractFromText(raw)
+    allCandidates = result.candidates
+    parsed        = result.parsed
+  }
+
+  // Dedup within candidates
+  const seen = new Set<string>()
+  allCandidates = allCandidates.filter(cand => {
+    const key = cand.text.toLowerCase().trim()
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+
+  // Dedup against existing store
+  const store    = loadStore()
+  const existing = store.memories.map(m => m.content.toLowerCase())
+  allCandidates  = allCandidates.filter(cand =>
+    !existing.some(e => e.includes(cand.text.toLowerCase().slice(0, 40)))
+  )
+
+  s.stop(`Parsed ${parsed} entries`)
+
+  if (alreadyStored.length > 0) {
+    note(
+      alreadyStored.map(t => `${c.green}✔${c.reset}  "${t.slice(0, 70)}"`).join("\n"),
+      `already in store (${alreadyStored.length})`
+    )
+  }
+
+  if (allCandidates.length === 0) {
+    outro("No new memories found.")
+    return
+  }
+
+  const selected = await multiselect({
+    message: "Select memories to store:",
+    options: allCandidates.map((cand, i) => ({
+      value: String(i),
+      label: `"${cand.text.slice(0, 80)}"`,
+      hint:  `${cand.type} · ${cand.domain}`,
+    })),
+    initialValues: allCandidates.map((_, i) => String(i)),
+  })
+
+  if (isCancel(selected) || (selected as string[]).length === 0) {
+    outro("Nothing stored.")
+    return
+  }
+
+  const toStore = (selected as string[]).map(i => allCandidates[parseInt(i)])
+  const scope   = readCurrentScope()
+
+  for (const cand of toStore) {
+    const memory: Memory = {
+      id:         crypto.randomUUID().slice(0, 8),
+      type:       cand.type,
+      content:    cand.text,
+      domain:     cand.domain,
+      confidence: 0.6,
+      importance: 0.5,
+      source:     "ai",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+    store.memories.push(memory)
+    runHook("on-memory-added", memory)
+  }
+
+  saveStore(store)
+  outro(`${c.green}✓${c.reset}  Stored ${toStore.length} memor${toStore.length === 1 ? "y" : "ies"} → scope: ${scope}`)
+}
+
 async function cmdWatch(): Promise<void> {
   const scope = readCurrentScope()
   const file  = scopeFile(scope)
@@ -852,6 +1118,11 @@ ${c.bold}COMMANDS${c.reset}
   ${c.green}resume${c.reset}   ${c.dim}"<session summary>"${c.reset}
       Store a session summary (for AIs to call at end of session).
 
+  ${c.green}harvest${c.reset}  ${c.dim}<file.jsonl|file.txt>${c.reset}
+      Extract memories from a session transcript (heuristic, no AI call).
+      ${c.dim}--last${c.reset}   Auto-detect the most recent Claude Code session.
+      Supports .jsonl (Claude Code, structured) or any plain text file.
+
   ${c.green}recall${c.reset}   ${c.dim}[query]${c.reset}
       Search memories by content, type or domain.
 
@@ -877,6 +1148,8 @@ ${c.bold}EXAMPLES${c.reset}
   ${c.dim}memory forget a1b2c3d4${c.reset}
   ${c.dim}memory setup${c.reset}
   ${c.dim}memory setup myproject    # project-specific connectors: gemini-memory-myproject${c.reset}
+  ${c.dim}memory harvest --last     # extract memories from last Claude Code session${c.reset}
+  ${c.dim}memory harvest session.txt  # extract from any plain text transcript${c.reset}
 `)
 }
 
@@ -886,6 +1159,7 @@ const [command = "help", ...rest] = args
 switch (command) {
   case "remember":  cmdRemember(rest);                         break
   case "resume":    cmdResume(rest);                           break
+  case "harvest":   cmdHarvest(rest).catch(console.error);     break
   case "recall":    cmdRecall(rest);                           break
   case "dump":      cmdDump();                                 break
   case "status":    cmdStatus();                               break
