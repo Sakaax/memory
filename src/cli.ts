@@ -230,21 +230,36 @@ function cmdContext(): void {
   ]
 
   if (store.memories.length > 0) {
-    const sorted = [...store.memories].sort(
-      (a, b) => b.importance - a.importance || b.confidence - a.confidence
-    )
+    // Score = confidence × importance — filters and orders context
+    const scored = store.memories
+      .filter(m => m.confidence >= 0.5)            // below 0.5 = too uncertain, skip
+      .map(m => ({ ...m, score: m.confidence * (0.5 + m.importance) }))
+      .sort((a, b) => b.score - a.score)
 
-    const grouped = sorted.reduce<Record<string, Memory[]>>((acc, m) => {
-      acc[m.domain] = [...(acc[m.domain] ?? []), m]
-      return acc
-    }, {})
+    // Separate strong facts (≥0.8) from normal ones
+    const strong = scored.filter(m => m.confidence >= 0.8)
+    const normal = scored.filter(m => m.confidence <  0.8)
 
-    for (const [domain, memories] of Object.entries(grouped)) {
-      lines.push(`[${domain.toUpperCase()}]`)
-      for (const m of memories) {
-        lines.push(`- (${m.type}) ${m.content}`)
+    if (strong.length > 0) {
+      lines.push("[STRONG — treat these as established facts]")
+      for (const m of strong) {
+        lines.push(`- ${m.content}`)
       }
       lines.push("")
+    }
+
+    if (normal.length > 0) {
+      const grouped = normal.reduce<Record<string, typeof normal>>((acc, m) => {
+        acc[m.domain] = [...(acc[m.domain] ?? []), m]
+        return acc
+      }, {})
+      for (const [domain, memories] of Object.entries(grouped)) {
+        lines.push(`[${domain.toUpperCase()}]`)
+        for (const m of memories) {
+          lines.push(`- (${m.type}) ${m.content}`)
+        }
+        lines.push("")
+      }
     }
   } else {
     lines.push("(no memories stored yet)\n")
