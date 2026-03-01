@@ -313,6 +313,52 @@ gemini-memory-myapp            # only knows about myapp memories
 gemini-memory                  # knows global memories
 ```
 
+### Learn
+
+Analyse your shell history and infer preferences automatically — no manual input needed.
+
+```bash
+memory learn shell             # analyse ~/.zsh_history or ~/.bash_history
+```
+
+An interactive selector shows what memory inferred, with confidence scores based on frequency. You choose what to store.
+
+**What it detects:**
+- Package manager (`bun` vs `npm` vs `yarn` vs `pnpm`)
+- Deploy tool (`railway`, `vercel`, `netlify`, `fly`)
+- Git tool (`gh`, `git`, `lazygit`)
+- Editor (`nvim`, `vim`, `code`, `cursor`, `nano`)
+- Runtime (`bun`, `node`, `deno`, `python`)
+- Container tool (`docker`, `podman`)
+- System package manager (`pacman`, `yay`, `apt`, `brew`)
+
+**Confidence** is calculated from frequency — seen 3x = 50%, seen 50x+ = 95%. The daemon runs this automatically in the background as you work (see [Daemon](#daemon)).
+
+### Shell Hooks
+
+Auto-redirect commands based on your stored preferences.
+
+```bash
+memory shell install           # generate hooks + patch .zshrc
+memory shell update            # regenerate after memory changes
+```
+
+After `install`, reload your shell:
+
+```bash
+source ~/.zshrc
+```
+
+Then:
+
+```bash
+npm install lodash
+# ⚡ memory → bun
+# bun add lodash
+```
+
+Hooks are generated from memories with confidence ≥ 75%. The daemon regenerates them automatically when confidence updates. Hooks live in `~/.memory/shell-hooks.sh`.
+
 ### Diagnostics
 
 ```bash
@@ -597,14 +643,19 @@ memory/
 ## Roadmap
 
 **Next**
-- [ ] Extension store listing — Chrome Web Store + Firefox Add-ons
+- [ ] `memory learn git` — infer coding conventions from commit history and diffs
+- [ ] `memory learn code` — infer stack and patterns from a codebase
+- [ ] Proper documentation site (currently README only)
 
 **Later**
-- [ ] Mobile app — persistent memory on phone (local-only)
 - [ ] Confidence decay — memories fade without reinforcement
+- [ ] Mobile app — persistent memory on phone (local-only)
 - [ ] Device sync — opt-in, encrypted
 
 **Done**
+- [x] Shell hooks — `memory shell install` auto-redirects commands (e.g. npm → bun)
+- [x] Shell observer — `memory learn shell` + daemon background inference from zsh/bash history
+- [x] Confidence-weighted context — `[STRONG]` section for high-confidence facts (≥ 0.8)
 - [x] `memoryd` — background daemon (`memory daemon start/stop/status/install`)
 - [x] Browser extension — inject memory into Claude.ai, ChatGPT, Gemini (Chrome MV3 + Firefox MV2)
 - [x] `memory harvest` — extract memories from session transcripts (heuristic, no AI call)
