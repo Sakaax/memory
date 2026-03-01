@@ -586,6 +586,114 @@ async function cmdSetup(args: string[]): Promise<void> {
   outro(`${c.dim}Reload shell: source ${rc}${c.reset}`)
 }
 
+// ── Daemon ────────────────────────────────────────────────────────────────────
+const DAEMON_PID_FILE = join(MEMORY_HOME, "daemon.pid")
+const DAEMON_LOG_FILE = join(MEMORY_HOME, "daemon.log")
+
+function daemonPid(): number | null {
+  if (!existsSync(DAEMON_PID_FILE)) return null
+  const pid = parseInt(readFileSync(DAEMON_PID_FILE, "utf8").trim(), 10)
+  if (isNaN(pid)) return null
+  // Check if process is actually running
+  try { process.kill(pid, 0); return pid } catch { return null }
+}
+
+async function cmdDaemon(args: string[]): Promise<void> {
+  const sub = args[0]
+
+  if (sub === "stop") {
+    const pid = daemonPid()
+    if (!pid) { console.log(`${c.dim}memoryd is not running${c.reset}`); return }
+    process.kill(pid, "SIGTERM")
+    unlinkSync(DAEMON_PID_FILE)
+    console.log(`${c.green}✓${c.reset} memoryd stopped (pid ${pid})`)
+    return
+  }
+
+  if (sub === "status") {
+    const pid = daemonPid()
+    if (pid) {
+      console.log(`${c.green}●${c.reset} memoryd running  pid=${pid}  http://127.0.0.1:7711`)
+    } else {
+      console.log(`${c.dim}○ memoryd stopped${c.reset}`)
+    }
+    return
+  }
+
+  if (sub === "install") {
+    const bunBin = Bun.which("bun") ?? join(HOME, ".bun/bin/bun")
+    const cliPath = join(INSTALL_DIR, "src/cli.ts")
+    const unit = `[Unit]
+Description=Memory daemon — local AI context server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=${bunBin} run ${cliPath} daemon start --foreground
+Restart=on-failure
+RestartSec=5
+Environment=HOME=${HOME}
+
+[Install]
+WantedBy=default.target
+`
+    const systemdDir = join(HOME, ".config/systemd/user")
+    mkdirSync(systemdDir, { recursive: true })
+    const unitPath = join(systemdDir, "memoryd.service")
+    writeFileSync(unitPath, unit)
+    console.log(`${c.green}✓${c.reset} Unit written: ${unitPath}`)
+    console.log(`\nEnable & start:`)
+    console.log(`  ${c.cyan}systemctl --user daemon-reload${c.reset}`)
+    console.log(`  ${c.cyan}systemctl --user enable --now memoryd${c.reset}`)
+    return
+  }
+
+  // Default: start
+  const foreground = args.includes("--foreground")
+
+  if (!foreground) {
+    const existing = daemonPid()
+    if (existing) {
+      console.log(`${c.green}●${c.reset} memoryd already running (pid ${existing})`)
+      return
+    }
+
+    // Spawn detached process
+    const self = join(INSTALL_DIR, "src/cli.ts")
+    const proc = Bun.spawn(["bun", "run", self, "daemon", "start", "--foreground"], {
+      detached: true,
+      stdio: ["ignore", Bun.file(DAEMON_LOG_FILE), Bun.file(DAEMON_LOG_FILE)],
+    })
+    proc.unref()
+    // Give it a moment to bind
+    await Bun.sleep(400)
+    const pid = daemonPid()
+    if (pid) {
+      console.log(`${c.green}✓${c.reset} memoryd started  pid=${pid}  http://127.0.0.1:7711`)
+    } else {
+      console.log(`${c.red}✗${c.reset} memoryd failed to start — check ${DAEMON_LOG_FILE}`)
+    }
+    return
+  }
+
+  // --foreground: actually run the server (used by systemd + detached spawn)
+  const { startServer, PORT } = await import("./ui/server")
+  writeFileSync(DAEMON_PID_FILE, String(process.pid))
+  const server = startServer()
+  process.on("SIGTERM", () => {
+    server.stop()
+    try { unlinkSync(DAEMON_PID_FILE) } catch {}
+    process.exit(0)
+  })
+  process.on("SIGINT", () => {
+    server.stop()
+    try { unlinkSync(DAEMON_PID_FILE) } catch {}
+    process.exit(0)
+  })
+  // Keep alive
+  await new Promise(() => {})
+}
+
 async function cmdUI(): Promise<void> {
   const { startServer, PORT } = await import("./ui/server")
   const url = `http://127.0.0.1:${PORT}`
@@ -1137,6 +1245,7 @@ ${c.bold}COMMANDS${c.reset}
   ${c.green}setup${c.reset}      ${c.dim}[scope]${c.reset}  Configure connectors. Pass scope to create project-specific wrappers.
   ${c.green}uninstall${c.reset}  Remove connectors interactively.
   ${c.green}ui${c.reset}         Launch local web interface at http://127.0.0.1:7711.
+  ${c.green}daemon${c.reset}     ${c.dim}start | stop | status | install${c.reset}  Background API server.
 
 ${c.bold}TYPES${c.reset}
   ${c.dim}${VALID_TYPES.join(" · ")}${c.reset}
@@ -1171,6 +1280,7 @@ switch (command) {
   case "setup":     cmdSetup(rest).catch(console.error);       break
   case "uninstall": cmdUninstall().catch(console.error);       break
   case "ui":        cmdUI().catch(console.error);              break
+  case "daemon":    cmdDaemon(rest).catch(console.error);      break
   case "help":
   default:          cmdHelp()
 }

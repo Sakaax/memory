@@ -321,6 +321,24 @@ Output:
   ✔ MEMORY_HOME level  global
 ```
 
+### Daemon
+
+Run the API server as a background process — no need to keep a terminal open.
+
+```bash
+memory daemon start            # start in background, print pid
+memory daemon stop             # stop the background process
+memory daemon status           # show running state + pid
+memory daemon install          # write ~/.config/systemd/user/memoryd.service
+```
+
+After `daemon install`:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now memoryd   # auto-start at login
+```
+
 ### UI
 
 ```bash
@@ -445,7 +463,16 @@ Inject your memory context into any web AI interface — Claude.ai, ChatGPT, Gem
 
 ### Prerequisites
 
-The local server must be running:
+The local server must be running. The easiest way is the background daemon:
+
+```bash
+memory daemon start        # start in background (persists across terminal sessions)
+memory daemon status       # check if running
+memory daemon stop         # stop it
+memory daemon install      # generate a systemd unit for auto-start at login
+```
+
+Or run it in the foreground (classic):
 
 ```bash
 memory ui
@@ -462,7 +489,7 @@ memory ui
 **Firefox:**
 1. Go to `about:debugging`
 2. Click **This Firefox** → **Load Temporary Add-on**
-3. Select `extension/manifest.json`
+3. Select `extension-firefox/manifest.json`
 
 ### Usage
 
@@ -528,12 +555,14 @@ memory/
 │       ├── routes.ts       API routes (CORS-enabled)
 │       └── static/
 │           └── index.html  local web interface
-└── extension/
-    ├── manifest.json         MV2 — Chrome, Brave, Arc, Firefox (universal)
-    ├── background.js         fetch proxy (bypasses page CSP)
-    ├── content.js            floating inject button + scope picker
-    ├── popup.html            toolbar popup
-    └── popup.js              popup logic
+├── extension/              Chrome MV3 (Chrome, Brave, Arc)
+│   ├── manifest.json
+│   ├── background.js         fetch proxy (bypasses page CSP)
+│   ├── content.js            floating inject button + scope picker
+│   ├── popup.html / popup.js toolbar popup
+│   └── icons/
+└── extension-firefox/      Firefox MV2
+    └── manifest.json
 ```
 
 **Runtime directory** (`~/.memory/` by default, override with `MEMORY_HOME`):
@@ -555,8 +584,7 @@ memory/
 ## Roadmap
 
 **Next**
-- [ ] `memoryd` — background daemon (no need to keep `memory ui` open for the extension)
-- [ ] Extension icons + Chrome Web Store / Firefox Add-ons listing
+- [ ] Extension store listing — Chrome Web Store + Firefox Add-ons
 
 **Later**
 - [ ] Mobile app — persistent memory on phone (local-only)
@@ -564,7 +592,8 @@ memory/
 - [ ] Device sync — opt-in, encrypted
 
 **Done**
-- [x] Browser extension — inject memory into Claude.ai, ChatGPT, Gemini (MV3, Chrome + Firefox)
+- [x] `memoryd` — background daemon (`memory daemon start/stop/status/install`)
+- [x] Browser extension — inject memory into Claude.ai, ChatGPT, Gemini (Chrome MV3 + Firefox MV2)
 - [x] `memory harvest` — extract memories from session transcripts (heuristic, no AI call)
 - [x] AI write-back — AIs store memories autonomously via injected context
 - [x] `memory resume` — AIs store session summaries at end of conversation
