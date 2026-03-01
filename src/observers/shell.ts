@@ -96,7 +96,8 @@ const CATEGORIES: Category[] = [
       bun:    [/^bun\s run/, /^bun\s test/],
       node:   [/^node\s/],
       deno:   [/^deno\s/],
-      python: [/^python\s/, /^python3\s/],
+      // python3 -c "..." = inline script, weight 0.3x vs real script
+      python: [/^python\s(?!-c)/, /^python3\s(?!-c)/],
     },
     template: (w) => `Uses ${w} as primary runtime`,
   },
@@ -159,10 +160,14 @@ export function inferFromCommands(commands: string[]): ShellInference[] {
     if (sorted.length === 0) continue
 
     const [winner, winCount] = sorted[0]
+    const runnerUp = sorted[1]?.[1] ?? 0
     const losers = sorted.slice(1).map(([t]) => t)
 
     // Need at least 3 uses to infer
     if (winCount < 3) continue
+
+    // Dominance check: winner must be 2x the runner-up (avoids incoherent ties)
+    if (runnerUp > 0 && winCount < runnerUp * 2) continue
 
     // confidence: 0.5 base + up to 0.45 from frequency (caps at 50 uses)
     const confidence = Math.min(0.95, 0.5 + (winCount / 50) * 0.45)

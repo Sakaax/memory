@@ -67,6 +67,13 @@ function processNewCommands(): void {
   }
 
   saveStore(store)
+
+  // Regenerate shell hooks if installed
+  try {
+    const { writeShellHooks, HOOKS_SH } = await import("./shell-hooks")
+    const { existsSync } = await import("fs")
+    if (existsSync(HOOKS_SH)) writeShellHooks(loadStore().memories)
+  } catch {}
 }
 
 export function watchShellInBackground(): void {

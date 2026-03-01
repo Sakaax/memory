@@ -714,6 +714,36 @@ WantedBy=default.target
 
 // ── memory learn ──────────────────────────────────────────────────────────
 
+async function cmdShell(args: string[]): Promise<void> {
+  const sub = args[0]
+  const { writeShellHooks, installShellHooks, HOOKS_SH } = await import("./observers/shell-hooks")
+
+  if (sub === "install") {
+    const store = loadStore()
+    writeShellHooks(store.memories)
+    const { alreadyInstalled, rcFile } = installShellHooks()
+
+    if (alreadyInstalled) {
+      console.log(`${c.green}✓${c.reset} Shell hooks already sourced from ${rcFile}`)
+    } else {
+      console.log(`${c.green}✓${c.reset} Added to ${rcFile}`)
+    }
+    console.log(`${c.green}✓${c.reset} Hooks written to ${HOOKS_SH}`)
+    console.log(`\n  Reload your shell: ${c.cyan}source ~/${rcFile.split("/").pop()}${c.reset}`)
+    return
+  }
+
+  if (sub === "update") {
+    const store = loadStore()
+    writeShellHooks(store.memories)
+    console.log(`${c.green}✓${c.reset} Shell hooks updated`)
+    return
+  }
+
+  console.error(`Usage: memory shell install | update`)
+  process.exit(1)
+}
+
 async function cmdLearn(args: string[]): Promise<void> {
   const { intro, outro, multiselect, spinner, isCancel } = await import("@clack/prompts")
   const sub = args[0]
@@ -1460,6 +1490,7 @@ ${c.bold}COMMANDS${c.reset}
   ${c.green}ui${c.reset}         Launch local web interface at http://127.0.0.1:7711.
   ${c.green}daemon${c.reset}     ${c.dim}start | stop | status | install${c.reset}  Background API server.
   ${c.green}learn${c.reset}      ${c.dim}shell${c.reset}  Analyse shell history and infer preferences.
+  ${c.green}shell${c.reset}      ${c.dim}install | update${c.reset}  Install shell hooks (auto-redirect commands).
 
 ${c.bold}TYPES${c.reset}
   ${c.dim}${VALID_TYPES.join(" · ")}${c.reset}
@@ -1496,6 +1527,7 @@ switch (command) {
   case "ui":        cmdUI().catch(console.error);              break
   case "daemon":    cmdDaemon(rest).catch(console.error);      break
   case "learn":     cmdLearn(rest).catch(console.error);       break
+  case "shell":     cmdShell(rest).catch(console.error);       break
   case "help":
   default:          cmdHelp()
 }
