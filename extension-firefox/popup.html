@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 260px;
+      background: #08080f;
+      color: #e8e8f0;
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+      font-size: 13px;
+      padding: 14px 16px 16px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .logo {
+      font-family: monospace;
+      font-size: 15px;
+      font-weight: 700;
+      color: #4ade80;
+      letter-spacing: -0.3px;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-family: monospace;
+      color: #44445a;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #44445a;
+      flex-shrink: 0;
+    }
+    .dot.online  { background: #4ade80; }
+    .dot.offline { background: #f87171; }
+
+    .info-grid {
+      background: #0e0e1a;
+      border: 1px solid #1c1c32;
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .info-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #44445a;
+      font-weight: 700;
+    }
+
+    .info-val {
+      font-family: monospace;
+      font-size: 12px;
+      color: #7878a0;
+    }
+    .info-val.accent { color: #4ade80; }
+
+    .btn {
+      width: 100%;
+      padding: 9px;
+      border-radius: 8px;
+      border: 1px solid;
+      font-size: 13px;
+      font-family: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      margin-bottom: 7px;
+      text-align: center;
+    }
+    .btn:last-child { margin-bottom: 0; }
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.35; cursor: default; }
+
+    .btn-primary {
+      background: #4ade80;
+      color: #000;
+      border-color: #4ade80;
+    }
+
+    .btn-ghost {
+      background: #0e0e1a;
+      color: #7878a0;
+      border-color: #1c1c32;
+    }
+
+    .error-msg {
+      font-size: 11px;
+      color: #f87171;
+      font-family: monospace;
+      text-align: center;
+      padding: 4px 0;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <span class="logo">memory</span>
+    <div class="status-badge">
+      <span class="dot" id="dot"></span>
+      <span id="status-text">checking…</span>
+    </div>
+  </div>
+
+  <div class="info-grid" id="info-grid">
+    <div class="info-row">
+      <span class="info-label">Scope</span>
+      <span class="info-val accent" id="scope">—</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Memories</span>
+      <span class="info-val" id="count">—</span>
+    </div>
+  </div>
+
+  <div class="error-msg" id="error-msg">
+    Server offline — run: <strong>memory ui</strong>
+  </div>
+
+  <button class="btn btn-primary" id="btn-inject" disabled>⊕ Inject context</button>
+  <button class="btn btn-ghost"   id="btn-ui">Open memory UI ↗</button>
+
+  <script src="popup.js"></script>
+</body>
+</html>
