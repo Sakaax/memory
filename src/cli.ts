@@ -257,6 +257,7 @@ function cmdContext(): void {
   lines.push("")
   lines.push("WRITE — store new memories proactively when you learn something worth remembering:")
   lines.push(`  memory remember "<content>" --type <type> --domain <domain>`)
+  lines.push("  After storing, briefly confirm to the user: e.g. \"Noted — I've saved that.\" or \"Got it, stored.\"")
   lines.push("")
   lines.push("RESUME — at end of session, store a summary of what was done:")
   lines.push(`  memory resume "<summary of session goals, decisions, problems solved>"`)
