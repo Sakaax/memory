@@ -679,8 +679,10 @@ WantedBy=default.target
 
   // --foreground: actually run the server (used by systemd + detached spawn)
   const { startServer, PORT } = await import("./ui/server")
+  const { watchShellInBackground } = await import("./observers/shell-daemon")
   writeFileSync(DAEMON_PID_FILE, String(process.pid))
   const server = startServer()
+  watchShellInBackground()
   process.on("SIGTERM", () => {
     server.stop()
     try { unlinkSync(DAEMON_PID_FILE) } catch {}
@@ -693,6 +695,86 @@ WantedBy=default.target
   })
   // Keep alive
   await new Promise(() => {})
+}
+
+// ── memory learn ──────────────────────────────────────────────────────────
+
+async function cmdLearn(args: string[]): Promise<void> {
+  const { intro, outro, multiselect, spinner, isCancel } = await import("@clack/prompts")
+  const sub = args[0]
+
+  if (sub !== "shell") {
+    console.error(`Usage: memory learn shell`)
+    process.exit(1)
+  }
+
+  const { parseHistoryLines, inferFromCommands, SHELL_HISTORY_FILE } =
+    await import("./observers/shell")
+
+  intro(`${c.bold}  memory learn shell  ${c.reset}`)
+
+  const s = spinner()
+  s.start(`Reading ${SHELL_HISTORY_FILE}…`)
+
+  if (!existsSync(SHELL_HISTORY_FILE)) {
+    s.stop("History file not found")
+    outro("Nothing to learn.")
+    return
+  }
+
+  const raw        = readFileSync(SHELL_HISTORY_FILE, "utf8")
+  const commands   = parseHistoryLines(raw)
+  const inferences = inferFromCommands(commands)
+
+  s.stop(`Analysed ${commands.length} commands`)
+
+  // Dedup against existing store
+  const store    = loadStore()
+  const existing = store.memories.map(m => m.content.toLowerCase())
+  const fresh    = inferences.filter(inf =>
+    !existing.some(e => e.includes(inf.content.toLowerCase().slice(0, 40)))
+  )
+
+  if (fresh.length === 0) {
+    outro("Nothing new — store already up to date.")
+    return
+  }
+
+  const selected = await multiselect({
+    message: "Select inferences to store:",
+    options: fresh.map((inf, i) => ({
+      value: String(i),
+      label: `"${inf.content}"`,
+      hint:  `${inf.type} · ${inf.domain} · seen ${inf.count}x · confidence ${(inf.confidence * 100).toFixed(0)}%`,
+    })),
+    initialValues: fresh.map((_, i) => String(i)),
+  })
+
+  if (isCancel(selected) || (selected as string[]).length === 0) {
+    outro("Nothing stored.")
+    return
+  }
+
+  const indices = (selected as string[]).map(Number)
+  for (const i of indices) {
+    const inf = fresh[i]
+    const mem: Memory = {
+      id:         crypto.randomUUID().slice(0, 8),
+      type:       inf.type,
+      content:    inf.content,
+      domain:     inf.domain,
+      confidence: inf.confidence,
+      importance: 0.6,
+      source:     "shell-observer",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+    store.memories.push(mem)
+    runHook("on-memory-added", mem)
+  }
+  saveStore(store)
+
+  outro(`${c.green}✓${c.reset} Stored ${indices.length} inference${indices.length === 1 ? "" : "s"}`)
 }
 
 async function cmdUI(): Promise<void> {
@@ -1362,6 +1444,7 @@ ${c.bold}COMMANDS${c.reset}
   ${c.green}uninstall${c.reset}  Remove connectors interactively.
   ${c.green}ui${c.reset}         Launch local web interface at http://127.0.0.1:7711.
   ${c.green}daemon${c.reset}     ${c.dim}start | stop | status | install${c.reset}  Background API server.
+  ${c.green}learn${c.reset}      ${c.dim}shell${c.reset}  Analyse shell history and infer preferences.
 
 ${c.bold}TYPES${c.reset}
   ${c.dim}${VALID_TYPES.join(" · ")}${c.reset}
@@ -1397,6 +1480,7 @@ switch (command) {
   case "uninstall": cmdUninstall().catch(console.error);       break
   case "ui":        cmdUI().catch(console.error);              break
   case "daemon":    cmdDaemon(rest).catch(console.error);      break
+  case "learn":     cmdLearn(rest).catch(console.error);       break
   case "help":
   default:          cmdHelp()
 }
