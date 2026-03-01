@@ -158,7 +158,7 @@ memory scope use global        # back to global
 
 ### Watch
 
-Stream live memory change events from the active scope.
+**Stream memory events** (no args):
 
 ```bash
 memory watch
@@ -184,6 +184,19 @@ memory watch | while read line; do echo "changed: $line"; done
 ```
 
 Press `Ctrl+C` to stop.
+
+**Session capture** (with a provider):
+
+```bash
+memory watch gemini            # launch gemini-memory, capture session
+memory watch gemini monprojet  # launch gemini-memory-monprojet
+memory watch codex             # launch codex-memory
+memory watch claude            # launch claude-memory
+```
+
+Wraps the provider CLI transparently — you interact normally. On exit, the session is analysed with the same heuristics as `memory harvest`. An interactive selector lets you pick which candidates to store.
+
+Works with any installed connector: `gemini`, `codex`, `claude`, `opencode`, `aider`, `goose`, `groq`, `ollama`, `sgpt`, `droid`.
 
 ### Hooks
 
@@ -601,7 +614,7 @@ memory/
 - [x] Scopes — independent memory contexts per project (`create` / `use` / `delete`)
 - [x] Local UI — scope switcher, move memory between scopes, delete scope, custom confirm modals, card dropdown menu
 - [x] Hooks — local scripts triggered on memory events
-- [x] Watch — live memory change stream
+- [x] Watch — live memory event stream + session capture for any provider CLI
 - [x] 11 connectors — Claude, Gemini, Codex, OpenCode, Aider, ShellGPT, Goose, Groq, Ollama, Cursor Agent, Droid
 
 ---
