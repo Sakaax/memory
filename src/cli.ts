@@ -811,8 +811,71 @@ async function cmdLearn(args: string[]): Promise<void> {
     return
   }
 
+  if (sub === "code") {
+    const { analyzeCodebase } = await import("./observers/code")
+    const { intro, outro, multiselect, spinner, isCancel } = await import("@clack/prompts")
+
+    const cwd = args[1] ?? process.cwd()
+    intro(`${c.bold}  memory learn code  ${c.reset}`)
+
+    const s = spinner()
+    s.start(`Analysing ${cwd}…`)
+
+    const { inferences, fileCount } = analyzeCodebase(cwd)
+    s.stop(`Analysed ${fileCount} files`)
+
+    // Dedup against existing store
+    const store    = loadStore()
+    const existing = store.memories.map(m => m.content.toLowerCase())
+    const fresh    = inferences.filter(inf =>
+      !existing.some(e => e.includes(inf.content.toLowerCase().slice(0, 40)))
+    )
+
+    if (fresh.length === 0) {
+      outro("Nothing new — store already up to date.")
+      return
+    }
+
+    const selected = await multiselect({
+      message: "Select inferences to store:",
+      options: fresh.map((inf, i) => ({
+        value: String(i),
+        label: `"${inf.content}"`,
+        hint:  `${inf.type} · ${inf.domain} · ${inf.evidence} · ${(inf.confidence * 100).toFixed(0)}%`,
+      })),
+      initialValues: fresh.map((_, i) => String(i)),
+    })
+
+    if (isCancel(selected) || (selected as string[]).length === 0) {
+      outro("Nothing stored.")
+      return
+    }
+
+    const indices = (selected as string[]).map(Number)
+    for (const i of indices) {
+      const inf = fresh[i]
+      const mem: Memory = {
+        id:         crypto.randomUUID().slice(0, 8),
+        type:       inf.type,
+        content:    inf.content,
+        domain:     inf.domain,
+        confidence: inf.confidence,
+        importance: 0.6,
+        source:     "code-observer",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+      store.memories.push(mem)
+      runHook("on-memory-added", mem)
+    }
+    saveStore(store)
+
+    outro(`${c.green}✓${c.reset} Stored ${indices.length} inference${indices.length === 1 ? "" : "s"}`)
+    return
+  }
+
   if (sub !== "shell") {
-    console.error(`Usage: memory learn shell|git [path]`)
+    console.error(`Usage: memory learn shell|git|code [path]`)
     process.exit(1)
   }
 
@@ -1552,7 +1615,7 @@ ${c.bold}COMMANDS${c.reset}
   ${c.green}uninstall${c.reset}  Remove connectors interactively.
   ${c.green}ui${c.reset}         Launch local web interface at http://127.0.0.1:7711.
   ${c.green}daemon${c.reset}     ${c.dim}start | stop | status | install${c.reset}  Background API server.
-  ${c.green}learn${c.reset}      ${c.dim}shell | git [path]${c.reset}  Analyse shell history or git repo and infer preferences.
+  ${c.green}learn${c.reset}      ${c.dim}shell | git | code [path]${c.reset}  Analyse shell history, git repo, or codebase and infer preferences.
   ${c.green}shell${c.reset}      ${c.dim}install | update${c.reset}  Install shell hooks (auto-redirect commands).
 
 ${c.bold}TYPES${c.reset}

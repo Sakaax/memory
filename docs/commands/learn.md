@@ -47,9 +47,56 @@ The daemon runs this continuously as you work. Every 10 new shell commands, infe
 
 ---
 
-## Coming soon
+## memory learn git
+
+Analyse a git repository — commit history, file extensions, config files, and `package.json` — to infer your stack and conventions.
 
 ```bash
-memory learn git    # infer conventions from commit history and diffs
-memory learn code   # infer stack and patterns from a codebase
+memory learn git              # analyse current directory
+memory learn git /path/to/repo
 ```
+
+**What it detects:**
+
+| Category | Examples |
+|---|---|
+| Commit convention | Conventional Commits, common scopes |
+| Languages | TypeScript, JavaScript, Python, Go, Rust, Shell |
+| Frameworks | Next.js, React Native, Expo, Tauri, Docker |
+| ORM / DB | Prisma, Drizzle |
+| Auth | NextAuth.js, Auth.js |
+| Tooling | Tailwind CSS, Zod, Stripe, Resend, Upstash |
+| Linting / formatting | ESLint, Prettier, Biome |
+| Testing | Vitest, Jest |
+| Package manager | Bun, pnpm, Yarn (from lockfile) |
+
+**Evidence:**
+
+Each inference shows what was found — e.g. `"drizzle-orm in package.json"`, `"42/60 commits follow Conventional Commits"`.
+
+---
+
+## memory learn code
+
+Analyse the source files in a codebase — imports, code style, TypeScript config, and directory structure.
+
+```bash
+memory learn code             # analyse current directory
+memory learn code /path/to/project
+```
+
+**What it detects:**
+
+| Category | Examples |
+|---|---|
+| TypeScript config | Strict mode, `@/*` path alias |
+| Directory structure | `src/app`, `src/components`, `src/actions`, `src/schemas` |
+| Libraries (imports) | React, Next.js, Prisma, Zod, Stripe, Resend, Zustand, TanStack Query, Framer Motion, Sentry, PostHog... |
+| Code style | async/await vs `.then()`, arrow vs regular functions, Server Components ratio |
+| File naming | kebab-case, camelCase, PascalCase |
+
+Up to 2000 files are walked (ignoring `node_modules`, `.git`, `dist`, etc.). Imports are scanned across up to 500 source files.
+
+**Evidence:**
+
+Each inference includes what was found — e.g. `"imported in 18 files"`, `"42 arrow vs 3 function declarations"`, `"tsconfig.json: strict: true"`.
