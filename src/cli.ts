@@ -1161,7 +1161,122 @@ Note: --last is Claude Code only. For other AIs, use write-back during session.`
   outro(`${c.green}✓${c.reset}  Stored ${toStore.length} memor${toStore.length === 1 ? "y" : "ies"} → scope: ${scope}`)
 }
 
-async function cmdWatch(): Promise<void> {
+async function cmdWatchSession(provider: string, scopeArg?: string): Promise<void> {
+  const { intro, outro, multiselect, spinner, note, isCancel } = await import("@clack/prompts")
+
+  // Resolve binary: memory watch gemini [scope] → gemini-memory[-scope]
+  const bin = scopeArg ? `${provider}-memory-${scopeArg}` : `${provider}-memory`
+
+  if (!Bun.which(bin)) {
+    console.error(`${c.red}✗${c.reset} Command not found: ${bin}`)
+    console.error(`  Run: ${c.cyan}memory setup${scopeArg ? ` ${scopeArg}` : ""}${c.reset}`)
+    process.exit(1)
+  }
+
+  // Temp file to capture session output
+  const tmpFile = `/tmp/memory-session-${Date.now()}.txt`
+
+  console.log(`\n  ${c.cyan}${c.bold}memory watch${c.reset}  →  launching ${c.green}${bin}${c.reset}`)
+  console.log(`  ${c.dim}Session will be analysed for memories on exit${c.reset}\n`)
+
+  // Use `script` to capture the full TTY session (user + AI output)
+  const proc = Bun.spawnSync(
+    ["script", "-q", "-c", bin, tmpFile],
+    { stdio: ["inherit", "inherit", "inherit"] }
+  )
+
+  // Session ended — harvest from captured file
+  console.log(`\n  ${c.dim}Session ended — analysing…${c.reset}\n`)
+
+  if (!existsSync(tmpFile)) {
+    console.error("Session file not found — nothing to analyse.")
+    return
+  }
+
+  intro(`${c.bold}  memory watch  ${c.reset}`)
+
+  const s = spinner()
+  s.start("Parsing session…")
+
+  // Strip ANSI escape codes and control chars
+  const raw   = readFileSync(tmpFile, "utf-8")
+  const clean = raw.replace(/\x1b\[[0-9;]*[mGKHF]/g, "").replace(/\r/g, "")
+
+  try { unlinkSync(tmpFile) } catch {}
+
+  const { candidates: allCandidatesRaw, parsed } = extractFromText(clean)
+
+  // Dedup within candidates
+  const seen = new Set<string>()
+  let allCandidates = allCandidatesRaw.filter(cand => {
+    const key = cand.text.toLowerCase().trim()
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+
+  // Dedup against existing store
+  const store    = loadStore()
+  const existing = store.memories.map(m => m.content.toLowerCase())
+  allCandidates  = allCandidates.filter(cand =>
+    !existing.some(e => e.includes(cand.text.toLowerCase().slice(0, 40)))
+  )
+
+  s.stop(`Parsed ${parsed} lines`)
+
+  if (allCandidates.length === 0) {
+    outro("No new memories found.")
+    return
+  }
+
+  const selected = await multiselect({
+    message: "Select memories to store:",
+    options: allCandidates.map((cand, i) => ({
+      value: String(i),
+      label: `"${cand.text.slice(0, 80)}"`,
+      hint:  `${cand.type} · ${cand.domain}`,
+    })),
+    initialValues: allCandidates.map((_, i) => String(i)),
+  })
+
+  if (isCancel(selected) || (selected as string[]).length === 0) {
+    outro("Nothing stored.")
+    return
+  }
+
+  const indices = (selected as string[]).map(Number)
+  const toStore = indices.map(i => allCandidates[i])
+  const targetScope = scopeArg ?? readCurrentScope()
+
+  for (const cand of toStore) {
+    const s2 = loadStore(targetScope)
+    const memory: Memory = {
+      id:         crypto.randomUUID().slice(0, 8),
+      type:       cand.type,
+      content:    cand.text,
+      domain:     cand.domain,
+      confidence: 0.6,
+      importance: 0.5,
+      source:     "watch",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+    s2.memories.push(memory)
+    saveStore(s2, targetScope)
+    runHook("on-memory-added", memory)
+  }
+
+  outro(`${c.green}✓${c.reset} Stored ${toStore.length} memor${toStore.length === 1 ? "y" : "ies"} in scope ${c.cyan}${targetScope}${c.reset}`)
+}
+
+async function cmdWatch(args: string[]): Promise<void> {
+  // memory watch <provider> [scope] → session capture mode
+  const knownProviders = ["claude", "gemini", "codex", "opencode", "aider", "goose", "groq", "ollama", "sgpt", "droid"]
+  if (args.length > 0 && knownProviders.includes(args[0])) {
+    return cmdWatchSession(args[0], args[1])
+  }
+
+  // memory watch (no args) → stream memory change events
   const scope = readCurrentScope()
   const file  = scopeFile(scope)
   const dir   = scopeDir(scope)
@@ -1240,7 +1355,7 @@ ${c.bold}COMMANDS${c.reset}
 
   ${c.green}status${c.reset}     Show statistics.
   ${c.green}dump${c.reset}       Export all memories as JSON.
-  ${c.green}watch${c.reset}      Stream live memory change events.
+  ${c.green}watch${c.reset}      ${c.dim}[provider] [scope]${c.reset}  Stream memory events, or wrap a provider CLI and harvest memories on exit.
   ${c.green}doctor${c.reset}     Diagnose storage, permissions, and scopes.
   ${c.green}scope${c.reset}      ${c.dim}list | use <name> | create <name>${c.reset}
   ${c.green}setup${c.reset}      ${c.dim}[scope]${c.reset}  Configure connectors. Pass scope to create project-specific wrappers.
@@ -1275,7 +1390,7 @@ switch (command) {
   case "status":    cmdStatus();                               break
   case "forget":    cmdForget(rest);                           break
   case "context":   cmdContext();                              break
-  case "watch":     cmdWatch().catch(console.error);           break
+  case "watch":     cmdWatch(rest).catch(console.error);        break
   case "doctor":    cmdDoctor();                               break
   case "scope":     cmdScope(rest);                            break
   case "setup":     cmdSetup(rest).catch(console.error);       break
