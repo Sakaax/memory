@@ -24,14 +24,23 @@ You keep re-explaining yourself.
 ```
 memory remember "I use Bun, never npm"   ← you, or any AI, writes
         ↓
-   ~/.memory/global/memory.json          ← single source of truth
+~/.memory/global/memory.json             ← single source of truth
+        ↓
+memory context --write --cwd $(pwd)      ← generates ~/.memory/context.md
+  ├── your memories                        (memories + live git + code analysis)
+  ├── git analysis of current project
+  └── code analysis of source files
+        ↓
    ↙    ↓    ↘
 Claude  Gemini  Codex                    ← all read the same context
    ↘    ↓    ↙
 memory remember "..."                    ← AIs write back automatically
 ```
 
-Context is injected at session start. No API calls. No cloud. No setup beyond the CLI.
+Context is injected at session start as a clean markdown file. No API calls. No cloud.
+
+- **Claude** receives a file path — reads `~/.memory/context.md` with its Read tool
+- **Others** receive the file content as text — richer than before (includes live stack detection)
 
 ---
 
@@ -56,13 +65,19 @@ Requires [Bun](https://bun.sh) — installed automatically if missing.
 ```bash
 memory remember "I use Bun, never npm" --type preference --domain development
 memory setup                     # configure AI connectors
-gemini-memory                    # launch Gemini with your context injected
+source ~/.zshrc
+
+cd ~/Dev/myproject
+claude-memory                    # launches Claude with context injected
+                                 # (memories + live git/code analysis of myproject)
 
 memory learn shell               # infer preferences from shell history
 memory learn git                 # infer stack from git repo
 memory learn code                # infer patterns from codebase
 memory daemon start              # background server
 memory ui                        # local web interface
+
+cat ~/.memory/context.md         # inspect the context file anytime
 ```
 
 ---

@@ -1,65 +1,94 @@
 # Context injection
 
-## What gets injected
+## How it works
 
-Every connector runs `memory context` before starting the AI. The output contains:
-
-1. **Memory context** — your stored memories, filtered and ordered by confidence
-2. **Write-back instructions** — how the AI should store new memories during the session
-
-## Format
+At every connector launch, memory generates a rich context file then tells the AI where to find it.
 
 ```
-=== USER MEMORY CONTEXT ===
-Background knowledge about the user. Use silently — do not repeat back unless asked.
+gemini-memory (or claude-memory, codex-memory…)
+  │
+  ├── memory context --write --cwd "$(pwd)"
+  │     ├── stored memories (scope)
+  │     ├── live git analysis of current project
+  │     ├── live code analysis of current project
+  │     └── writes → ~/.memory/context.md
+  │
+  └── inject into AI
+        Claude  → "Read ~/.memory/context.md with your Read tool"  (2 lines)
+        Aider   → --read ~/.memory/context.md                      (file flag)
+        Others  → inject file content as text                      (richer than before)
+```
 
-[STRONG — treat these as established facts]
+**File-capable AIs** (Claude Code, Aider) receive a path pointer — short, clean, re-readable anytime.
+
+**Text-injection AIs** (Gemini, Codex, Goose…) receive the file content — same mechanism as before, but now richer since it includes live git/code analysis.
+
+## Context file format
+
+`~/.memory/context.md` — generated fresh at each connector launch:
+
+```markdown
+# Memory Context
+_Scope: motoalpes · 2026-03-02 14:30 · /home/you/Dev/motoalpes_
+
+## Established facts
 - Uses bun as package manager, never npm
-- Uses pacman as system package manager
+- Uses TypeScript strict mode
+- Uses Conventional Commits format
 
-[DEVELOPMENT]
-- (preference) Uses docker for containers
-- (preference) Uses git for git operations
+## Development
+- Uses docker for containers
+- Uses git for git operations
 
-[PERSONAL]
-- (constraint) Ship fast — baby on the way
+## Project: motoalpes
+- Uses Next.js (next.config.ts found)
+- Uses Drizzle ORM (drizzle.config.ts)
+- Uses Tailwind CSS (tailwind.config.ts)
+- Uses Conventional Commits (42/60 commits)
 
-=== END MEMORY CONTEXT ===
+## Code conventions
+- Uses async/await exclusively (47 vs 11 .then())
+- Uses Server Components by default
+- Uses kebab-case for file naming
 
-=== MEMORY WRITE-BACK ===
-You can read and write the shared memory store at any time.
-
-WRITE — store new memories proactively when you learn something worth remembering:
-  memory remember "<content>" --type <type> --domain <domain>
-  After storing, briefly confirm to the user: e.g. "Noted — I've saved that."
-
-RESUME — at end of session, store a summary:
-  memory resume "<summary>"
-
-READ — refresh your context mid-session:
-  memory context
-  memory recall <query>
-...
-=== END WRITE-BACK ===
+## Memory write-back
+Store: `memory remember "..." --type <type> --domain <domain>`
+Summarize session: `memory resume "summary of what was done"`
+Refresh this file: `memory context --write --cwd $(pwd)`
 ```
+
+The file is inspectable at any time: `cat ~/.memory/context.md`.
+
+## What gets included
+
+| Section | Source |
+|---|---|
+| Established facts | Memories with confidence ≥ 0.8 |
+| Domain groups | Memories with confidence 0.5–0.79 |
+| Project stack | Live `git log` + config file analysis |
+| Code conventions | Live scan of source files (imports, style, naming) |
+| Write-back instructions | Static — always present |
 
 ## Ordering
 
-Memories are ordered by `confidence × importance`:
+Memories are ordered by `confidence × (0.5 + importance)`.
 
-```
-score = confidence × (0.5 + importance)
-```
+High-confidence, high-importance memories appear first and in the `## Established facts` section.
 
-High-confidence, high-importance memories appear first.
+## Refreshing mid-session
 
-## Re-reading mid-session
-
-AIs can refresh their context at any point during a session:
+For AIs with file access (Claude Code), re-read the file anytime:
 
 ```bash
-memory context           # full context
-memory recall <query>    # targeted search
+# Regenerate with current project
+memory context --write --cwd $(pwd)
+# Then read ~/.memory/context.md with your Read tool
+```
+
+For targeted search:
+```bash
+memory recall development
+memory recall bun
 ```
 
 ## Scope context
