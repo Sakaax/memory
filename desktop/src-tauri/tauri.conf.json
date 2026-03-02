@@ -1,6 +1,6 @@
 {
   "productName": "memory",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "identifier": "sh.memory.desktop",
   "build": {
     "frontendDist": "../dist",
