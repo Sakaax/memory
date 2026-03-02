@@ -219,7 +219,100 @@ function cmdResume(args: string[]): void {
   console.log(`Session summary stored: [${memory.id}] scope=${scope}`)
 }
 
-function cmdContext(): void {
+// ─── context file ─────────────────────────────────────────────────────────────
+
+const CONTEXT_FILE = join(MEMORY_HOME, "context.md")
+
+async function generateContextMarkdown(cwd?: string): Promise<string> {
+  const store = loadStore()
+  const scope = readCurrentScope()
+  const file  = scopeFile(scope)
+  const now   = new Date().toISOString().slice(0, 16).replace("T", " ")
+
+  const lines: string[] = [
+    "# Memory Context",
+    `_Scope: ${scope} · ${now}${cwd ? ` · ${cwd}` : ""}_`,
+    "",
+  ]
+
+  if (store.memories.length > 0) {
+    const scored = store.memories
+      .filter(m => m.confidence >= 0.5)
+      .map(m => ({ ...m, score: m.confidence * (0.5 + m.importance) }))
+      .sort((a, b) => b.score - a.score)
+
+    const strong = scored.filter(m => m.confidence >= 0.8)
+    const normal = scored.filter(m => m.confidence <  0.8)
+
+    if (strong.length > 0) {
+      lines.push("## Established facts")
+      for (const m of strong) lines.push(`- ${m.content}`)
+      lines.push("")
+    }
+
+    if (normal.length > 0) {
+      const grouped = normal.reduce<Record<string, typeof normal>>((acc, m) => {
+        acc[m.domain] = [...(acc[m.domain] ?? []), m]
+        return acc
+      }, {})
+      for (const [domain, memories] of Object.entries(grouped)) {
+        lines.push(`## ${domain.charAt(0).toUpperCase() + domain.slice(1)}`)
+        for (const m of memories) lines.push(`- ${m.content}`)
+        lines.push("")
+      }
+    }
+  } else {
+    lines.push("_(no memories stored yet)_\n")
+  }
+
+  // Live git analysis
+  if (cwd && existsSync(cwd)) {
+    try {
+      const { analyzeGitRepo } = await import("./observers/git")
+      const { inferences, repoName } = analyzeGitRepo(cwd)
+      if (inferences.length > 0) {
+        lines.push(`## Project: ${repoName}`)
+        for (const inf of inferences.slice(0, 12)) lines.push(`- ${inf.content}`)
+        lines.push("")
+      }
+    } catch { /* not a git repo — skip */ }
+
+    // Live code analysis
+    try {
+      const { analyzeCodebase } = await import("./observers/code")
+      const { inferences } = analyzeCodebase(cwd)
+      if (inferences.length > 0) {
+        lines.push("## Code conventions")
+        for (const inf of inferences.slice(0, 10)) lines.push(`- ${inf.content}`)
+        lines.push("")
+      }
+    } catch {}
+  }
+
+  lines.push("## Memory write-back")
+  lines.push("Store: `memory remember \"...\" --type <type> --domain <domain>`")
+  lines.push("Summarize session: `memory resume \"summary of what was done\"`")
+  lines.push("Refresh this file: `memory context --write --cwd $(pwd)`")
+  lines.push(`Scope: ${scope} · ${file}`)
+  lines.push("After storing, confirm briefly: \"Noted.\" or \"Got it, stored.\"")
+  lines.push("If you have shell access (Bash tool), run commands directly without asking.")
+  lines.push("")
+
+  return lines.join("\n")
+}
+
+async function cmdContext(args: string[]): Promise<void> {
+  // --write: generate rich markdown file (used by connectors)
+  if (args.includes("--write")) {
+    const cwdIdx = args.indexOf("--cwd")
+    const cwd = cwdIdx !== -1 ? args[cwdIdx + 1] : undefined
+    mkdirSync(MEMORY_HOME, { recursive: true })
+    const content = await generateContextMarkdown(cwd)
+    writeFileSync(CONTEXT_FILE, content)
+    return
+  }
+
+  // Legacy text output — backwards compatible (used by scripts that do CONTEXT=$(memory context))
   const store = loadStore()
   const scope = readCurrentScope()
   const file  = scopeFile(scope)
@@ -230,21 +323,17 @@ function cmdContext(): void {
   ]
 
   if (store.memories.length > 0) {
-    // Score = confidence × importance — filters and orders context
     const scored = store.memories
-      .filter(m => m.confidence >= 0.5)            // below 0.5 = too uncertain, skip
+      .filter(m => m.confidence >= 0.5)
       .map(m => ({ ...m, score: m.confidence * (0.5 + m.importance) }))
       .sort((a, b) => b.score - a.score)
 
-    // Separate strong facts (≥0.8) from normal ones
     const strong = scored.filter(m => m.confidence >= 0.8)
     const normal = scored.filter(m => m.confidence <  0.8)
 
     if (strong.length > 0) {
       lines.push("[STRONG — treat these as established facts]")
-      for (const m of strong) {
-        lines.push(`- ${m.content}`)
-      }
+      for (const m of strong) lines.push(`- ${m.content}`)
       lines.push("")
     }
 
@@ -255,9 +344,7 @@ function cmdContext(): void {
       }, {})
       for (const [domain, memories] of Object.entries(grouped)) {
         lines.push(`[${domain.toUpperCase()}]`)
-        for (const m of memories) {
-          lines.push(`- (${m.type}) ${m.content}`)
-        }
+        for (const m of memories) lines.push(`- (${m.type}) ${m.content}`)
         lines.push("")
       }
     }
@@ -280,8 +367,8 @@ function cmdContext(): void {
   lines.push("  Note: if context was compacted mid-session, summarize what you remember since then.")
   lines.push("")
   lines.push("READ — refresh your context mid-session:")
-  lines.push("  memory context           → full context (all memories, re-read at any time)")
-  lines.push("  memory recall <query>    → search by keyword, type, or domain")
+  lines.push(`  memory context           → full context (all memories, re-read at any time)`)
+  lines.push(`  memory recall <query>    → search by keyword, type, or domain`)
   lines.push("")
   lines.push("TYPE GUIDE — pick the most specific type:")
   lines.push("  preference   → how the user likes to work, tools, style, communication")
@@ -393,24 +480,18 @@ function ensureInPath(rc: string, dir: string, label: string): boolean {
 
 function makeWrapper(binPath: string, mode: string, flag?: string, scopeOverride?: string): string {
   const scopeLine = scopeOverride ? `export MEMORY_SCOPE="${scopeOverride}"\n` : ""
+  // Generate the rich context file (memories + live git/code analysis), then load it
   const header = `#!/usr/bin/env bash
 MEMORY_DIR="${INSTALL_DIR}"
-${scopeLine}CONTEXT=$("$MEMORY_DIR/memory" context 2>/dev/null)
+${scopeLine}"$MEMORY_DIR/memory" context --write --cwd "$(pwd)" 2>/dev/null
+CONTEXT_FILE="${CONTEXT_FILE}"
+CONTEXT=$(cat "$CONTEXT_FILE" 2>/dev/null)
 `
   // ── Modes with fully custom templates ───────────────────────────────────────
 
   if (mode === "read-file" && flag) {
-    // aider: no system-prompt flag — inject context via --read <tmpfile>
-    // uses trap (not exec) so temp file is cleaned up on exit
-    return header + `
-if [ -z "$CONTEXT" ]; then
-  exec "${binPath}" "$@"
-else
-  TMPFILE=$(mktemp /tmp/memory-XXXXXX.md)
-  printf '%s\\n' "$CONTEXT" > "$TMPFILE"
-  trap 'rm -f "$TMPFILE"' EXIT
-  "${binPath}" ${flag} "$TMPFILE" "$@"
-fi
+    // aider: pass the persistent context file directly — no temp file needed
+    return header + `"${binPath}" ${flag} "$CONTEXT_FILE" "$@"
 `
   }
 
@@ -445,7 +526,9 @@ fi
   let nonInteractiveCmd: string
 
   if (mode === "system-prompt" && flag) {
-    interactiveCmd    = `exec "${binPath}" "${flag}" "$CONTEXT"`
+    // Interactive: inject file path — Claude has Read tool to load it
+    interactiveCmd    = `exec "${binPath}" "${flag}" "Memory context: ${CONTEXT_FILE} — read this file first with your Read tool. Re-read anytime. To store: memory remember \\"...\\"."`
+    // Non-interactive (-p): inject content directly (safer for scripted use)
     nonInteractiveCmd = `"${binPath}" -p "${flag}" "$CONTEXT" "$*"`
 
   } else if (mode === "flag" && flag) {
@@ -1644,7 +1727,7 @@ switch (command) {
   case "dump":      cmdDump();                                 break
   case "status":    cmdStatus();                               break
   case "forget":    cmdForget(rest);                           break
-  case "context":   cmdContext();                              break
+  case "context":   cmdContext(rest).catch(console.error);      break
   case "watch":     cmdWatch(rest).catch(console.error);        break
   case "doctor":    cmdDoctor();                               break
   case "scope":     cmdScope(rest);                            break
