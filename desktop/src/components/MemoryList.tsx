@@ -113,7 +113,6 @@ export function MemoryList({ memories, currentScope, scopes, onChange }: Props) 
               memory={m}
               scopes={scopes.filter((s) => s !== currentScope)}
               onEdit={() => setEditing(m)}
-              onDelete={() => handleDelete(m.id)}
               onMove={(toScope) => handleMove(m.id, toScope)}
             />
           ))
@@ -124,6 +123,7 @@ export function MemoryList({ memories, currentScope, scopes, onChange }: Props) 
         <MemoryEditModal
           memory={editing ?? undefined}
           onSave={handleSave}
+          onDelete={editing ? () => { handleDelete(editing.id); setEditing(null) } : undefined}
           onClose={() => { setEditing(null); setCreating(false) }}
         />
       )}

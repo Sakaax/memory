@@ -5,11 +5,10 @@ interface Props {
   memory: Memory
   scopes: string[]
   onEdit: () => void
-  onDelete: () => void
   onMove: (toScope: string) => void
 }
 
-export function MemoryCard({ memory: m, scopes, onEdit, onDelete, onMove }: Props) {
+export function MemoryCard({ memory: m, scopes, onEdit, onMove }: Props) {
   const [showMove, setShowMove] = useState(false)
 
   const confLevel = m.confidence >= 0.8 ? "high" : m.confidence >= 0.5 ? "mid" : "low"
@@ -46,15 +45,6 @@ export function MemoryCard({ memory: m, scopes, onEdit, onDelete, onMove }: Prop
           )}
           <button className="icon-btn" title="Edit" onClick={onEdit}>
             ✎
-          </button>
-          <button
-            className="icon-btn danger"
-            title="Delete"
-            onClick={() => {
-              if (confirm(`Delete "${m.content}"?`)) onDelete()
-            }}
-          >
-            ×
           </button>
         </div>
       </div>

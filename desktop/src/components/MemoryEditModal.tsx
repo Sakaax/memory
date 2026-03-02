@@ -15,15 +15,17 @@ export interface MemoryFormData {
 interface Props {
   memory?: Memory
   onSave: (data: MemoryFormData) => void
+  onDelete?: () => void
   onClose: () => void
 }
 
-export function MemoryEditModal({ memory, onSave, onClose }: Props) {
+export function MemoryEditModal({ memory, onSave, onDelete, onClose }: Props) {
   const [content, setContent] = useState(memory?.content ?? "")
   const [type, setType] = useState(memory?.type ?? "preference")
   const [domain, setDomain] = useState(memory?.domain ?? "general")
   const [confidence, setConfidence] = useState(memory?.confidence ?? 0.7)
   const [importance, setImportance] = useState(memory?.importance ?? 0.5)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -103,12 +105,45 @@ export function MemoryEditModal({ memory, onSave, onClose }: Props) {
             </div>
           </div>
 
+          {/* Delete confirmation inline */}
+          {confirmDelete && (
+            <div className="delete-confirm">
+              <span className="delete-confirm-text">
+                Supprimer cette mémoire ? Cette action est irréversible.
+              </span>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => onDelete?.()}
+              >
+                Supprimer
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setConfirmDelete(false)}
+              >
+                Annuler
+              </button>
+            </div>
+          )}
+
           <div className="modal-actions">
+            {memory && onDelete && !confirmDelete && (
+              <button
+                type="button"
+                className="btn btn-danger"
+                style={{ marginRight: "auto" }}
+                onClick={() => setConfirmDelete(true)}
+              >
+                Supprimer
+              </button>
+            )}
             <button type="button" className="btn" onClick={onClose}>
-              Cancel
+              Annuler
             </button>
             <button type="submit" className="btn btn-primary">
-              {memory ? "Save" : "Add"}
+              {memory ? "Sauvegarder" : "Ajouter"}
             </button>
           </div>
         </form>

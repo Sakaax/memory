@@ -308,9 +308,9 @@ html, body, #root {
 }
 
 .badge-type {
-  color: #7dd3fc;
-  border-color: #0c4a6e;
-  background: #082f49;
+  color: #4ade80;
+  border-color: #166534;
+  background: #052e16;
 }
 
 .badge-domain {
@@ -580,6 +580,30 @@ html, body, #root {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #444; }
+
+/* ── Delete confirm inline ───────────────────────────────────────────── */
+
+.delete-confirm {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #1a0404;
+  border: 1px solid #450a0a;
+  border-radius: var(--radius);
+  animation: fadeIn 0.12s ease;
+}
+
+.delete-confirm-text {
+  flex: 1;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
 /* ── Move modal select ───────────────────────────────────────────────── */
 .move-scope-list {
