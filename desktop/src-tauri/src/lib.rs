@@ -20,6 +20,10 @@ pub fn run() {
             move_memory,
             run_learn_json,
             store_inferences,
+            get_context_file,
+            regenerate_context,
+            get_providers,
+            remove_provider,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

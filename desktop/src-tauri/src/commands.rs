@@ -333,3 +333,87 @@ pub fn store_inferences(input: StoreInferencesInput) -> Result<usize, String> {
     save_store(&input.scope, &store)?;
     Ok(count)
 }
+
+// ── Context file ──────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn get_context_file() -> Option<String> {
+    fs::read_to_string(memory_home().join("context.md")).ok()
+}
+
+#[tauri::command]
+pub fn regenerate_context(cwd: String) -> Result<String, String> {
+    let bin = find_memory_bin()?;
+    Command::new(&bin)
+        .args(["context", "--write", "--cwd", &cwd])
+        .output()
+        .map_err(|e| format!("Failed to run memory: {}", e))?;
+    fs::read_to_string(memory_home().join("context.md"))
+        .map_err(|e| format!("Could not read context.md: {}", e))
+}
+
+// ── Providers ─────────────────────────────────────────────────────────────────
+
+const KNOWN_PROVIDERS: &[(&str, &str, &str)] = &[
+    ("Claude Code",    "claude-memory",       "claude"),
+    ("Gemini CLI",     "gemini-memory",       "gemini"),
+    ("Codex CLI",      "codex-memory",        "codex"),
+    ("OpenCode",       "opencode-memory",     "opencode"),
+    ("Aider",          "aider-memory",        "aider"),
+    ("ShellGPT",       "sgpt-memory",         "sgpt"),
+    ("Goose",          "goose-memory",        "goose"),
+    ("Groq",           "groq-memory",         "groq"),
+    ("Ollama",         "ollama-memory",       "ollama"),
+    ("Cursor Agent",   "cursor-agent-memory", "cursor-agent"),
+    ("Droid",          "droid-memory",        "droid"),
+];
+
+#[derive(Debug, Serialize)]
+pub struct Provider {
+    pub label: String,
+    pub bin_name: String,
+    pub command: String,
+    pub installed: bool,
+    pub path: Option<String>,
+}
+
+fn bin_dirs() -> Vec<String> {
+    let home = std::env::var("HOME").unwrap_or_default();
+    vec![
+        format!("{}/.local/bin", home),
+        format!("{}/.bun/bin", home),
+        "/usr/local/bin".to_string(),
+    ]
+}
+
+#[tauri::command]
+pub fn get_providers() -> Vec<Provider> {
+    let dirs = bin_dirs();
+    KNOWN_PROVIDERS.iter().map(|(label, bin_name, _)| {
+        let found = dirs.iter().find_map(|dir| {
+            let p = format!("{}/{}", dir, bin_name);
+            if std::path::Path::new(&p).exists() { Some(p) } else { None }
+        });
+        Provider {
+            label: label.to_string(),
+            bin_name: bin_name.to_string(),
+            command: bin_name.to_string(),
+            installed: found.is_some(),
+            path: found,
+        }
+    }).collect()
+}
+
+#[tauri::command]
+pub fn remove_provider(bin_name: String) -> Result<(), String> {
+    let dirs = bin_dirs();
+    let mut removed = false;
+    for dir in &dirs {
+        let path = format!("{}/{}", dir, bin_name);
+        if std::path::Path::new(&path).exists() {
+            fs::remove_file(&path).map_err(|e| e.to_string())?;
+            removed = true;
+        }
+    }
+    if removed { Ok(()) } else { Err(format!("{} not found", bin_name)) }
+}

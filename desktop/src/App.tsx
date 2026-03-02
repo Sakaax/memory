@@ -3,9 +3,11 @@ import { invoke } from "@tauri-apps/api/core"
 import { Sidebar } from "./components/Sidebar"
 import { MemoryList } from "./components/MemoryList"
 import { LearnPanel } from "./components/LearnPanel"
+import { ContextView } from "./components/ContextView"
+import { ProvidersView } from "./components/ProvidersView"
 import type { Memory } from "./types"
 
-type View = "memories" | "learn"
+type View = "memories" | "learn" | "context" | "providers"
 
 export default function App() {
   const [scopes, setScopes] = useState<string[]>(["global"])
@@ -94,18 +96,25 @@ export default function App() {
 
       {/* Main */}
       <main className="main">
-        {view === "memories" ? (
+        {view === "memories" && (
           <MemoryList
             memories={memories}
             currentScope={currentScope}
             scopes={scopes}
             onChange={handleMemoryChange}
           />
-        ) : (
+        )}
+        {view === "learn" && (
           <LearnPanel
             currentScope={currentScope}
             onChange={handleMemoryChange}
           />
+        )}
+        {view === "context" && (
+          <ContextView currentScope={currentScope} />
+        )}
+        {view === "providers" && (
+          <ProvidersView />
         )}
       </main>
     </div>

@@ -1,6 +1,6 @@
 import { useState } from "react"
 
-type View = "memories" | "learn"
+type View = "memories" | "learn" | "context" | "providers"
 
 interface Props {
   scopes: string[]
@@ -96,6 +96,22 @@ export function Sidebar({
       >
         <span style={{ fontSize: 14 }}>⚡</span>
         Learn
+      </button>
+
+      <button
+        className={`sidebar-nav-item ${view === "context" ? "active" : ""}`}
+        onClick={() => onViewChange("context")}
+      >
+        <span style={{ fontSize: 14 }}>📄</span>
+        Context
+      </button>
+
+      <button
+        className={`sidebar-nav-item ${view === "providers" ? "active" : ""}`}
+        onClick={() => onViewChange("providers")}
+      >
+        <span style={{ fontSize: 14 }}>🔌</span>
+        Providers
       </button>
     </aside>
   )

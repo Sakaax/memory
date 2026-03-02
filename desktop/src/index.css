@@ -642,3 +642,198 @@ html, body, #root {
   font-size: 13px;
 }
 .move-scope-item:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Context view ────────────────────────────────────────────────────── */
+
+.context-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.context-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+.ctx-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.ctx-scope-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 10px;
+}
+.ctx-scope-label { color: var(--accent); font-size: 11px; }
+.ctx-path        { color: var(--text-3); font-size: 10px; }
+
+.ctx-heading1 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-top: 12px;
+  font-family: var(--font);
+}
+.ctx-heading2 {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-top: 10px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+  font-family: var(--font);
+}
+.ctx-item {
+  display: flex;
+  gap: 8px;
+  color: var(--text);
+  padding: 1px 0;
+}
+.ctx-bullet { color: var(--accent); flex-shrink: 0; }
+.ctx-meta   { color: var(--text-3); font-style: italic; font-size: 11px; }
+.ctx-code   {
+  color: var(--text-2);
+  background: var(--surface2);
+  border-radius: 3px;
+  padding: 2px 6px;
+  margin: 2px 0;
+}
+.ctx-line   { color: var(--text-2); }
+.ctx-error  {
+  color: var(--danger);
+  font-size: 12px;
+  padding: 8px 12px;
+  background: #1a0404;
+  border: 1px solid #450a0a;
+  border-radius: var(--radius);
+  margin-bottom: 10px;
+}
+
+/* ── Providers view ──────────────────────────────────────────────────── */
+
+.providers-view {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.providers-section { display: flex; flex-direction: column; gap: 10px; }
+
+.providers-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.providers-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+}
+.providers-count {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 20px;
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.providers-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.provider-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: border-color 0.1s;
+}
+.provider-card--connected { border-color: #166534; background: #030f06; }
+.provider-card--connected:hover { border-color: var(--accent); }
+.provider-card--available { opacity: 0.5; }
+
+.provider-card-icon {
+  font-size: 16px;
+  color: var(--accent);
+  width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.provider-card-info { flex: 1; min-width: 0; }
+.provider-card-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.provider-card-cmd {
+  display: block;
+  font-size: 11px;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  margin-top: 2px;
+}
+.provider-card-path {
+  font-size: 10px;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider-card-actions { flex-shrink: 0; }
+
+.provider-confirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.provider-confirm-text {
+  font-size: 11px;
+  color: var(--danger);
+  white-space: nowrap;
+}
+
+.providers-empty {
+  font-size: 12px;
+  color: var(--text-3);
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.providers-empty code { color: var(--text-2); font-family: var(--font-mono); }
+
+.providers-install-hint {
+  font-size: 11px;
+  color: var(--text-3);
+  padding: 8px 0 0;
+}
+.providers-install-hint code { color: var(--text-2); font-family: var(--font-mono); }
