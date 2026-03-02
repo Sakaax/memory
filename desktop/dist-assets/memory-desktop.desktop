@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=memory
+Comment=Persistent cognitive layer for AI systems
+Exec=memory-desktop
+Icon=memory-desktop
+Categories=Utility;Development;
+Keywords=memory;ai;context;notes;
+StartupNotify=true
+StartupWMClass=memory-desktop

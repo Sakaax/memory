@@ -1,0 +1,58 @@
+# Maintainer: Sakaax <sakaax@example.com>
+pkgname=memory-desktop
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Persistent cognitive layer for AI systems — desktop interface"
+arch=('x86_64')
+url="https://github.com/Sakaax/memory"
+license=('MIT')
+depends=(
+  'webkit2gtk-4.1'
+  'gtk3'
+  'libsoup3'
+)
+makedepends=(
+  'rust'
+  'cargo'
+  'bun'
+  'nodejs'
+)
+source=("$pkgname-$pkgver.tar.gz::https://github.com/Sakaax/memory/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')  # Replace with actual sha256 after first release
+
+prepare() {
+  cd "memory-$pkgver/desktop"
+  bun install --frozen-lockfile
+}
+
+build() {
+  cd "memory-$pkgver/desktop"
+  export HOME="$srcdir/home"
+  mkdir -p "$HOME"
+  # Build frontend
+  bun run build
+  # Build Rust backend
+  cd src-tauri
+  cargo build --release
+}
+
+package() {
+  cd "memory-$pkgver/desktop"
+
+  # Binary
+  install -Dm755 "src-tauri/target/release/memory-desktop" \
+    "$pkgdir/usr/bin/memory-desktop"
+
+  # Icon
+  install -Dm644 "src-tauri/icons/128x128.png" \
+    "$pkgdir/usr/share/icons/hicolor/128x128/apps/memory-desktop.png"
+  install -Dm644 "src-tauri/icons/32x32.png" \
+    "$pkgdir/usr/share/icons/hicolor/32x32/apps/memory-desktop.png"
+
+  # .desktop file
+  install -Dm644 "dist-assets/memory-desktop.desktop" \
+    "$pkgdir/usr/share/applications/memory-desktop.desktop"
+
+  # License
+  install -Dm644 "../LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

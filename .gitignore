@@ -4,3 +4,5 @@ bun.lockb
 .DS_Store
 CLAUDE.md
 .claude/
+desktop/src-tauri/target/
+desktop/dist/

@@ -828,14 +828,22 @@ async function cmdShell(args: string[]): Promise<void> {
 }
 
 async function cmdLearn(args: string[]): Promise<void> {
-  const { intro, outro, multiselect, spinner, isCancel } = await import("@clack/prompts")
-  const sub = args[0]
+  const jsonMode = args.includes("--json")
+  const cleanArgs = args.filter(a => a !== "--json")
+  const sub = cleanArgs[0]
 
   if (sub === "git") {
     const { analyzeGitRepo } = await import("./observers/git")
-    const { intro, outro, multiselect, spinner, isCancel, note } = await import("@clack/prompts")
 
-    const cwd = args[1] ?? process.cwd()
+    const cwd = cleanArgs[1] ?? process.cwd()
+
+    if (jsonMode) {
+      const { inferences, repoName, commits } = analyzeGitRepo(cwd)
+      console.log(JSON.stringify({ type: "git", cwd, repoName, commits, inferences }))
+      return
+    }
+
+    const { intro, outro, multiselect, spinner, isCancel, note } = await import("@clack/prompts")
     intro(`${c.bold}  memory learn git  ${c.reset}`)
 
     const s = spinner()
@@ -896,9 +904,16 @@ async function cmdLearn(args: string[]): Promise<void> {
 
   if (sub === "code") {
     const { analyzeCodebase } = await import("./observers/code")
-    const { intro, outro, multiselect, spinner, isCancel } = await import("@clack/prompts")
 
-    const cwd = args[1] ?? process.cwd()
+    const cwd = cleanArgs[1] ?? process.cwd()
+
+    if (jsonMode) {
+      const { inferences, fileCount } = analyzeCodebase(cwd)
+      console.log(JSON.stringify({ type: "code", cwd, fileCount, inferences }))
+      return
+    }
+
+    const { intro, outro, multiselect, spinner, isCancel } = await import("@clack/prompts")
     intro(`${c.bold}  memory learn code  ${c.reset}`)
 
     const s = spinner()
@@ -965,6 +980,19 @@ async function cmdLearn(args: string[]): Promise<void> {
   const { parseHistoryLines, inferFromCommands, SHELL_HISTORY_FILE } =
     await import("./observers/shell")
 
+  if (jsonMode) {
+    if (!existsSync(SHELL_HISTORY_FILE)) {
+      console.log(JSON.stringify({ type: "shell", inferences: [] }))
+      return
+    }
+    const raw        = readFileSync(SHELL_HISTORY_FILE, "utf8")
+    const commands   = parseHistoryLines(raw)
+    const inferences = inferFromCommands(commands)
+    console.log(JSON.stringify({ type: "shell", commandCount: commands.length, inferences }))
+    return
+  }
+
+  const { intro, outro, multiselect, spinner, isCancel } = await import("@clack/prompts")
   intro(`${c.bold}  memory learn shell  ${c.reset}`)
 
   const s = spinner()
@@ -1032,26 +1060,11 @@ async function cmdLearn(args: string[]): Promise<void> {
 }
 
 async function cmdUI(): Promise<void> {
-  const { startServer, PORT } = await import("./ui/server")
-  const url = `http://127.0.0.1:${PORT}`
-
-  const server = startServer()
-
-  // Auto-open browser
-  const opener = process.platform === "darwin" ? "open" : "xdg-open"
-  Bun.spawnSync([opener, url])
-
-  console.log(`\n  ${c.cyan}${c.bold}memory ui${c.reset}  →  ${c.green}${url}${c.reset}`)
-  console.log(`  ${c.dim}Press Ctrl+C to stop${c.reset}\n`)
-
-  process.on("SIGINT", () => {
-    server.stop()
-    console.log(`\n  ${c.dim}memory ui stopped${c.reset}`)
-    process.exit(0)
-  })
-
-  // Keep process alive
-  await new Promise(() => {})
+  console.log(`\n  ${c.yellow}memory ui has moved.${c.reset}`)
+  console.log(`  Use ${c.cyan}${c.bold}memory-desktop${c.reset} — the new desktop app.\n`)
+  console.log(`  Install → https://github.com/Sakaax/memory/releases`)
+  console.log(`  The daemon (${c.dim}memory daemon start${c.reset}) still runs for the browser extension.\n`)
+  process.exit(0)
 }
 
 async function cmdUninstall(): Promise<void> {
@@ -1696,8 +1709,8 @@ ${c.bold}COMMANDS${c.reset}
   ${c.green}scope${c.reset}      ${c.dim}list | use <name> | create <name>${c.reset}
   ${c.green}setup${c.reset}      ${c.dim}[scope]${c.reset}  Configure connectors. Pass scope to create project-specific wrappers.
   ${c.green}uninstall${c.reset}  Remove connectors interactively.
-  ${c.green}ui${c.reset}         Launch local web interface at http://127.0.0.1:7711.
-  ${c.green}daemon${c.reset}     ${c.dim}start | stop | status | install${c.reset}  Background API server.
+  ${c.green}ui${c.reset}         ${c.dim}Deprecated → use memory-desktop (https://github.com/Sakaax/memory/releases).${c.reset}
+  ${c.green}daemon${c.reset}     ${c.dim}start | stop | status | install${c.reset}  Background API server (for browser extension).
   ${c.green}learn${c.reset}      ${c.dim}shell | git | code [path]${c.reset}  Analyse shell history, git repo, or codebase and infer preferences.
   ${c.green}shell${c.reset}      ${c.dim}install | update${c.reset}  Install shell hooks (auto-redirect commands).
 
