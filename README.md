@@ -74,8 +74,8 @@ claude-memory                    # launches Claude with context injected
 memory learn shell               # infer preferences from shell history
 memory learn git                 # infer stack from git repo
 memory learn code                # infer patterns from codebase
-memory daemon start              # background server
-memory ui                        # local web interface
+memory daemon start              # background server (required for browser extension)
+memory-desktop                   # desktop app — browse/edit memories, run learn, view context
 
 cat ~/.memory/context.md         # inspect the context file anytime
 ```
@@ -107,7 +107,7 @@ Inject your memory context into Claude.ai, ChatGPT, and Gemini with a single cli
 - **Chrome / Brave / Arc** — load `extension/` as an unpacked extension
 - **Firefox** — load `extension-firefox/manifest.json` via `about:debugging`
 
-Requires `memory daemon start` or `memory ui` running locally.
+Requires `memory daemon start` running locally.
 
 ---
 
@@ -125,9 +125,9 @@ Requires `memory daemon start` or `memory ui` running locally.
 - [x] AI write-back — AIs store memories autonomously
 - [x] `memory watch <provider>` — session capture mode
 - [x] Scopes — independent memory contexts per project
-- [x] Local UI — browse, edit, move memories between scopes
 - [x] Hooks — local scripts triggered on memory events
 - [x] 11 connectors
+- [x] Desktop app — native UI (Tauri v2), available on AUR
 
 **Next**
 - [ ] Confidence decay — memories fade without reinforcement

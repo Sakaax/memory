@@ -76,6 +76,16 @@ memory daemon start
 
 Runs the API server in the background — required for the browser extension and continuous shell observation.
 
+### 6. Open the desktop app *(optional)*
+
+```bash
+memory-desktop
+```
+
+Browse and edit memories, run `learn`, view the context file, manage providers — all in a local native UI.
+
+Install: [GitHub Releases](https://github.com/Sakaax/memory/releases) or `yay -S memory-desktop` on Arch.
+
 ---
 
 ## Verify everything works

@@ -11,7 +11,8 @@
   - [harvest](commands/harvest.md)
   - [scope](commands/scopes.md)
   - [daemon](commands/daemon.md)
-  - [ui](commands/ui.md)
+  - [ui *(deprecated)*](commands/ui.md)
+  - [desktop app](desktop.md)
 
 - **CONCEPTS**
   - [Confidence scoring](concepts/confidence.md)
